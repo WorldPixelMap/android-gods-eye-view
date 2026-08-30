@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌐 God's Eye View
+# 🌐 Android God's Eye View
 ### By **WorldPixelMap**
 
 <p align="center">
