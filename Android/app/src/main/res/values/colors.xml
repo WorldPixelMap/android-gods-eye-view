@@ -1,0 +1,10 @@
+<resources>
+    <color name="gev_background">#040810</color>
+    <color name="gev_surface">#0b111e</color>
+    <color name="gev_accent_green">#00ff88</color>
+    <color name="gev_accent_blue">#38bdf8</color>
+    <color name="gev_text_primary">#f1f5f9</color>
+    <color name="gev_text_muted">#94a3b8</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+</resources>

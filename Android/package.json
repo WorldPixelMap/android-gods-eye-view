@@ -1,0 +1,9 @@
+{
+  "name": "gods-eye-view-android",
+  "version": "1.0.0",
+  "description": "Android application build scripts for God's Eye View",
+  "type": "module",
+  "scripts": {
+    "sync": "node ./scripts/build-apk-assets.mjs"
+  }
+}

@@ -1,0 +1,21 @@
+node_modules
+dist
+.env
+*.log
+screenshots/
+qa-shots/
+output/
+.gev-logs/
+.gev-cache/
+.DS_Store
+.gstack/
+3d-models/
+
+# Android build outputs and caches
+.gradle/
+Android/.gradle/
+Android/build/
+Android/app/build/
+Android/local.properties
+Android/.idea/
+*.apk
