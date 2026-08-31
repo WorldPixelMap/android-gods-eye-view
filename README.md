@@ -10,7 +10,7 @@
 ### A real-time geospatial intelligence console for planet Earth.
 
 Photorealistic 3D globe, live aircraft, global maritime vessels, orbital satellites, seismic monitors, wildfire sensors, and public photographic CCTV feeds. Powered by a hands-free realtime AI agent. Available for modern web browsers and Android devices.
-### "Special Thanks to @bilawalsidhu"
+
 
 *No place left behind.*
 Try other Apps: *https://worldpixelmap.in/apps_suite/*
