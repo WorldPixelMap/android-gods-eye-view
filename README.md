@@ -1,7 +1,6 @@
 <div align="center">
 
 # 🌐 Android God's Eye View
-# "Special Thanks to @bilawalsidhu"
 ### By **WorldPixelMap**
 
 <p align="center">
