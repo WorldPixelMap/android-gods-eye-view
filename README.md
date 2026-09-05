@@ -67,7 +67,6 @@ God's Eye View incorporates an enterprise-grade, hardware-bound licensing archit
 ### License Endpoints & Store Links:
 - **🛒 Product Store:** [Purchase a License Key](https://worldpixelmap.in/apps_suite/product.php?slug=agev)
 - **👤 Customer Portal:** [Manage Devices & Licenses](https://worldpixelmap.in/apps_suite/portal.php)
-- **🌐 License Validation Server:** `https://worldpixelmap.in/apps_suite/license.php`
 
 ---
 
