@@ -1575,7 +1575,7 @@ function celestrakProxy() {
       signal: AbortSignal.timeout(20000),
       // CelesTrak 403s bulk groups (e.g. `active`) unless the request carries a
       // descriptive User-Agent with a contact point.
-      headers: { 'User-Agent': 'gods-eye-view-celestrak-proxy/1.0 (+https://github.com/bilawalsidhu/gods-eye-view)' },
+      headers: { 'User-Agent': 'gods-eye-view-celestrak-proxy/1.0 (+https://github.com/WorldPixelMap/android-gods-eye-view)' },
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const body = await res.text();
@@ -7118,8 +7118,8 @@ function fetchRegionalPlace(point) {
     });
     const payload = await fetchRegionalJson(`https://nominatim.openstreetmap.org/reverse?${params}`, {
       headers: {
-        'User-Agent': 'GodsEyeView/0.1 (+https://github.com/bilawalsidhu/gods-eye-view)',
-        Referer: 'https://github.com/bilawalsidhu/gods-eye-view',
+        'User-Agent': 'GodsEyeView/0.1 (+https://github.com/WorldPixelMap/android-gods-eye-view)',
+        Referer: 'https://github.com/WorldPixelMap/android-gods-eye-view',
       },
     });
     return normalizeRegionalPlace(payload);
