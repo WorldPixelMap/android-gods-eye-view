@@ -9,7 +9,7 @@ import {
   resolveVoiceModel,
   serializeCostLimits,
 } from './voiceCost.js';
-import { KeyStore, KEY_IDS } from '../config/keyStore.js';
+import { keyStore, GEV_KEYS } from '../androidBridge.js';
 
 const TOKEN_URL = '/api/realtime/token';
 const REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
@@ -2313,51 +2313,70 @@ function isNearlyBlackFrame(ctx, width, height) {
  * against its own tier assumption.
  */
 async function fetchRealtimeToken(tier = DEFAULT_VOICE_TIER) {
-  const userOpenAIKey = KeyStore.getKey(KEY_IDS.OPENAI);
-  const resolved = resolveVoiceModel(tier);
-
-  // Try local/server proxy first if available
+  const modelConfig = resolveVoiceModel(tier);
+  let userKey = '';
   try {
-    const url = `${TOKEN_URL}?tier=${encodeURIComponent(resolved.tier)}`;
-    const response = await fetch(url, { cache: 'no-store' });
-    if (response.ok) {
-      const data = await response.json().catch(() => null);
-      const servedModel = response.headers?.get?.('X-GEV-Voice-Model')
-        || data?.session?.model
-        || null;
-      const servedTier = response.headers?.get?.('X-GEV-Voice-Tier') || null;
-      const token = data?.value || data?.client_secret?.value || data?.client_secret;
-      if (token) return { token, model: servedModel, tier: servedTier };
+    userKey = keyStore?.getKey?.(GEV_KEYS?.OPENAI || 'OPENAI_API_KEY') || '';
+  } catch {}
+
+  // If a manual OpenAI API key is configured (BYOK mode on Android / client), mint session directly
+  if (userKey) {
+    try {
+      const sessionRes = await fetch('https://api.openai.com/v1/realtime/sessions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${userKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelConfig.id,
+        }),
+      });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        const token = sessionData?.client_secret?.value || sessionData?.value;
+        if (token) {
+          return {
+            token,
+            model: sessionData?.model || modelConfig.id,
+            tier: modelConfig.tier,
+          };
+        }
+      }
+      const errData = await sessionRes.json().catch(() => null);
+      if (errData?.error?.message) {
+        throw new Error(errData.error.message);
+      }
+    } catch (err) {
+      if (err?.message && !err.message.includes('fetch') && !err.message.includes('network') && !err.message.includes('Failed to fetch')) {
+        throw err;
+      }
+      console.warn('[Realtime] Direct session creation failed, trying backend proxy:', err);
     }
-  } catch {
-    // Proxy unavailable (e.g. mobile standalone APK without backend node server)
   }
 
-  // Standalone client direct connection using User-supplied OpenAI key
-  if (userOpenAIKey) {
-    const res = await fetch('https://api.openai.com/v1/realtime/sessions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${userOpenAIKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: resolved.id || 'gpt-realtime-2',
-        voice: 'marin',
-      }),
-    });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      const reason = errData?.error?.message || `HTTP ${res.status}`;
-      throw new Error(`OpenAI Realtime error: ${reason}`);
-    }
-    const data = await res.json();
-    const token = data?.client_secret?.value || data?.value;
-    if (!token) throw new Error('Realtime token response did not include a client secret');
-    return { token, model: resolved.id, tier: resolved.tier };
+  const url = `${TOKEN_URL}?tier=${encodeURIComponent(modelConfig.tier)}`;
+  const headers = userKey ? { Authorization: `Bearer ${userKey}` } : {};
+  const response = await fetch(url, { headers, cache: 'no-store' });
+  const data = await response.json().catch(() => null);
+  // Server echo first (authoritative, always present); the minted session
+  // config is the fallback when a proxy strips headers.
+  const servedModel = response.headers?.get?.('X-GEV-Voice-Model')
+    || data?.session?.model
+    || null;
+  const servedTier = response.headers?.get?.('X-GEV-Voice-Tier') || null;
+  if (!response.ok) {
+    // OpenAI error bodies are objects ({error:{message,type,...}}); only the
+    // key-absent server case is a bare string. Render either without the
+    // "[object Object]" that String(object) produces (H9).
+    const reason = typeof data?.error === 'string'
+      ? data.error
+      : data?.error?.message;
+    throw new Error(reason || `Realtime token failed: HTTP ${response.status}`);
   }
-
-  throw new Error('OpenAI Realtime requires an API key. Tap Settings ⚙️ to add your OpenAI key.');
+  const token = data?.value || data?.client_secret?.value || data?.client_secret;
+  if (!token) throw new Error('Realtime token response did not include a client secret');
+  return { token, model: servedModel, tier: servedTier };
 }
 
 function extractFunctionCalls(event) {
@@ -2585,7 +2604,7 @@ function createVoiceControl({ reset = false } = {}) {
         </div>
       </div>
       <button id="gev-voice-button" type="button" aria-label="Voice control — hold Space to speak; click to toggle voice" aria-describedby="gev-voice-help">
-        <span class="gev-mic-orbit"><img src="./mic.svg" alt="" /></span>
+        <span class="gev-mic-orbit"><img src="/mic.svg" alt="" /></span>
         <span class="gev-mic-label">ON/OFF</span>
       </button>
       <div class="gev-voice-visualizer" aria-hidden="true">

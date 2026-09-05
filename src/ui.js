@@ -12,7 +12,7 @@ import {
   clampBloomIntensity,
   decodeBloomIntensity,
 } from './bloom.js';
-import { LOCATIONS, CITY_POIS, GLOBE_VIEW, flyToGlobeView, flyToPresetLocation, flyToPOI, searchAndFlyTo } from './locations.js';
+import { LOCATIONS, CITY_POIS, GLOBE_VIEW, flyToGlobeView, flyToLandmark, flyToPresetLocation, flyToPOI, searchAndFlyTo } from './locations.js';
 import { locationMiniStatus } from './locationStatus.js';
 import { interruptCameraMotion } from './cameraVerbs.js';
 import {
@@ -228,9 +228,9 @@ const COCKPIT_ENTRY_COLLAPSE_PANEL_IDS = Object.freeze([
  */
 const PANEL_POSITION_STORAGE_VERSION = 'v8';
 const DETECTION_ALLOCATION_STORAGE_KEY = 'gev:detection-allocation:v1';
-/** Z ladder: panels promote within [200, 350] above command dock (145); toast 400, clean-view-exit 500. */
-const PANEL_Z_BASE = 200;
-const PANEL_Z_MAX = 350;
+/** Z ladder: panels promote within [100, 139]; voice pill 150, toast 200, clean-view-exit 300. */
+const PANEL_Z_BASE = 100;
+const PANEL_Z_MAX = 139;
 const COCKPIT_HEADING_SLEW_DPS = 28;
 const COCKPIT_FORWARD_OFFSET_M = 7;
 const COCKPIT_UP_OFFSET_M = 2.6;
@@ -367,12 +367,11 @@ const STYLE_STATUS_LABELS = {
 /**
  * The tactical detection look: Dense at 75%.
  *
- * Field test 2026-08-18: "detection mode… 75% weighted, with the 16% fade
+ * Owner playtest 2026-08-18: "detection mode… 75% weighted, with the 16% fade
  * and 5% outside, whatever we had. I want that as the default. It should just
  * happen." Fade and outside opacity live in GLOBAL_POST_DEFAULTS, so "whatever
  * we had" still needs nothing here — but they are 7% and 1% now, the outside
- * default having moved 5 → 3 → 1 during final field tuning (2026-08-24).
- * What the quote asked for is the
+ * default having moved 5 → 3 → 1 as the owner locked final tuning after field trials (2026-08-24). What the quote asked for is the
  * baseline of the day, not the two numbers it happened to name.
  *
  * ONE object, shared by the first-load baseline below, by every military style,
@@ -2255,6 +2254,7 @@ export class StyleManager {
     this._scopeFeatherValue = document.getElementById('scope-feather-value');
     this._mapStackChips = document.getElementById('map-stack-chips');
     this._mapStackStatus = document.getElementById('map-stack-status');
+    this._mapStackChangeHandler = null;
     this._cleanViewBtn = document.getElementById('clean-view-toggle');
     this._cleanViewExitBtn = document.getElementById('clean-view-exit');
     this._dataPanel = document.getElementById('data-panel');
@@ -2357,6 +2357,10 @@ export class StyleManager {
     this._globalLoadingLabel = document.getElementById('global-loading-label');
     this._globalLoadingDetail = document.getElementById('global-loading-detail');
     this._resetGlobeBtn = document.getElementById('reset-globe-view');
+    this._myLocationBtn = document.getElementById('my-location-btn');
+    this._locationGpsBtn = document.getElementById('location-gps-btn');
+    this._gpsLocationEntity = null;
+    this._myLocationHandler = null;
     this._cockpitResetGlobeBtn = document.getElementById('cockpit-reset-globe');
     this._styleButtons = document.getElementById('style-buttons');
     this._trafficSyncChip = document.getElementById('traffic-sync-chip');
@@ -2591,7 +2595,7 @@ export class StyleManager {
       document.getElementById('models3d-mode-all'),
     ];
     // DISPLAY-rail 3D-aircraft toggle (flights layer param). DEFAULT-ON in
-    // PROXIMITY (product invariant 2026-08-22) — mirrors the `models3d` default in
+    // PROXIMITY (owner directive 2026-08-22) — mirrors the `models3d` default in
     // layerState.js and `_models3dEnabled` in both flight layers, and the `active`
     // class the button carries in index.html. A fresh boot skips layer-state
     // restoration, so these initializers are the only thing keeping the lit
@@ -2627,6 +2631,7 @@ export class StyleManager {
     this._initShareButton();
     this._initClearSelectedLayersButton();
     this._initResetGlobeButton();
+    this._initMyLocationButton();
     this._initHUDToggle();
     this._initModels3dToggle();
     this._applyGlobalPostDefaults();
@@ -3021,7 +3026,7 @@ export class StyleManager {
   }
 
   /**
-   * Contacts-scoped detection (field test 2026-08-18: "when you click on
+   * Contacts-scoped detection (owner playtest 2026-08-18: "when you click on
    * Contacts, detections should just turn on, and they should stay on in
    * Cockpit or in third-person tracking inside Contacts").
    *
@@ -3052,7 +3057,7 @@ export class StyleManager {
         const state = this.getDetectionState();
         return { mode: state.detectionMode, densityPct: state.densityPct };
       },
-      // Field test: the force-on lands on the tactical look the military
+      // Owner playtest: the force-on lands on the tactical look the military
       // styles apply — the SAME preset object — not on whatever profile the
       // operator last happened to leave detection at.
       applyPreset: () => this._applyDetectionPreset(MILITARY_DETECTION_PRESET),
@@ -3116,7 +3121,7 @@ export class StyleManager {
     this._revealCockpitStyleParameters({ openDisplay: revealParameters });
   }
 
-  /** IR hot-target boost (field test 2026-08-16): under the luminance-
+  /** IR hot-target boost (owner playtest 2026-08-16): under the luminance-
    *  mapped NVG/FLIR looks the 3D fleets flip to flat white so contacts read
    *  HOT instead of vanishing mid-gray; restored when the look exits. The
    *  EFFECTIVE look is Cockpit's vision override while Cockpit is active
@@ -3479,13 +3484,26 @@ export class StyleManager {
   }
 
   /**
-   * Renders the validated map stack chip row from the matching controller
+   * Renders the owner-approved map stack chip row from the matching controller
    * entries. Cesium ion/Bing chips remain keyboard-focusable but unavailable,
    * with an accessible explanation, until a CESIUM_ION_TOKEN is configured.
    * @returns {void}
    */
   _initMapStackControl() {
     if (!this._mapStackChips || !this.mapStackController) return;
+
+    if (!this._mapStackChangeHandler) {
+      // Provider-driven transitions (notably Esri tile-error fallback) do not
+      // pass through `_setMapStack()`. Follow the controller's existing public
+      // event so the lit tile, the status line, AND the durable share state all
+      // describe the rendered source — without the share sync, a silent
+      // fallback leaves copyLink() encoding a stack that is no longer shown.
+      this._mapStackChangeHandler = (event) => {
+        this._renderMapStackState(event.detail);
+        this._syncShareState();
+      };
+      window.addEventListener('gev:map-stack-changed', this._mapStackChangeHandler);
+    }
 
     renderMapStackChips(this._mapStackChips, this.mapStackController.getStacks(), {
       activeId: this.mapStackController.getActiveId(),
@@ -3714,8 +3732,8 @@ export class StyleManager {
    *
    * Deliberately does NOT consult `_detectionUserOverridden` — the CALLER owns
    * that decision. The style path checks it (an explicit Sparse/Off must
-   * survive a style switch); Cockpit entry does not because detection remains
-   * active in Cockpit.
+   * survive a style switch); Cockpit entry does not (owner: detection is on in
+   * the cockpit "regardless").
    * @param {{mode?: string, densityPct?: number}} det Preset detection config.
    * @returns {void}
    */
@@ -3924,11 +3942,37 @@ export class StyleManager {
     document.querySelectorAll('.panel-collapse-btn[data-collapse-target]').forEach((btn) => {
       const targetId = btn.dataset.collapseTarget;
       if (targetId) targets.add(targetId);
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
         const targetId = btn.dataset.collapseTarget;
         if (!targetId) return;
         const nextCollapsed = !document.getElementById(targetId)?.classList.contains('collapsed');
         this.setPanelCollapsed(targetId, nextCollapsed, { explicit: true });
+      });
+    });
+
+    // Allow tapping/clicking the entire header row or pill to expand/collapse (essential for touch/mobile)
+    const headerSelectors = '.panel-header, .pp-header-row, .compact.pp-header-row';
+    document.querySelectorAll(headerSelectors).forEach((header) => {
+      header.addEventListener('click', (event) => {
+        if (event.target.closest('input, select, option, a') || (event.target.closest('button') && !event.target.closest('.panel-collapse-btn'))) {
+          return;
+        }
+        const panel = header.closest('.panel-collapsible, [data-panel-id]');
+        if (!panel) return;
+        const targetId = panel.id;
+        const nextCollapsed = !panel.classList.contains('collapsed');
+        this.setPanelCollapsed(targetId, nextCollapsed, { explicit: true });
+      });
+    });
+
+    // When a panel is in the collapsed pill state, clicking anywhere on the pill expands it
+    document.querySelectorAll('.panel-collapsible[data-panel-id]').forEach((panel) => {
+      panel.addEventListener('click', (event) => {
+        if (!panel.classList.contains('collapsed')) return;
+        if (event.target.closest('.panel-collapse-btn')) return;
+        if (event.target.closest('input, select, button')) return;
+        this.setPanelCollapsed(panel.id, false, { explicit: true });
       });
     });
 
@@ -3946,6 +3990,20 @@ export class StyleManager {
     this._initCommandDockPins();
     this._initCommandDockTrayMetrics();
     this._maybeNotifyLayoutReset();
+    this._syncExpandedPanelStacks();
+  }
+
+  /**
+   * Tracks whether left or right stacks contain any expanded panel,
+   * enabling full-height presentation above all other display layers.
+   * @returns {void}
+   */
+  _syncExpandedPanelStacks() {
+    const hasExpandedLeft = Boolean(this._leftPanelStack?.querySelector(':scope > [data-panel-id]:not(.collapsed)'));
+    this._leftPanelStack?.classList.toggle('has-expanded-panel', hasExpandedLeft);
+    const hasExpandedRight = Boolean(this._rightPanelStack?.querySelector(':scope > [data-panel-id]:not(.collapsed)'))
+      || !document.getElementById('pp-toggles')?.classList.contains('collapsed');
+    this._rightPanelStack?.classList.toggle('has-expanded-panel', hasExpandedRight);
   }
 
   /**
@@ -4124,7 +4182,7 @@ export class StyleManager {
     // Plain `document.activeElement` is the wrong test — Chromium focuses a
     // <button> on mouse press, so once Map Source moved into this tray a tile
     // CLICK left focus parked inside and the popover never dismissed on
-    // mouse-away (field report; Location, whose input is genuinely
+    // mouse-away (owner field report; Location, whose input is genuinely
     // keyboard-focused when clicked, still dismissed). `:focus-visible` is the
     // platform's own pointer-vs-keyboard focus signal, so a typed-into field
     // still holds the tray open while a clicked tile does not. A browser
@@ -6855,7 +6913,8 @@ export class StyleManager {
         this._syncPanelCollapseButton(panel);
       }
     }
-    const isMobile = window.matchMedia('(max-width: 720px)').matches || window.innerHeight <= 600 || window.matchMedia('(max-height: 600px)').matches;
+    const isMobile = window.matchMedia('(max-width: 720px)').matches;
+    const isCompactMobile = isMobile || (window.innerHeight > 0 && window.innerHeight <= 560);
     const hasExpandedPanel = panels.some((panel) => (
       !panel.classList.contains('collapsed') && (!isMobile || panel.id !== 'pp-toggles')
     ));
@@ -6869,21 +6928,12 @@ export class StyleManager {
       else panel.removeAttribute('aria-hidden');
     }
 
-    if (isMobile) {
+    if (isMobile || isCompactMobile) {
       stack.classList.remove('layout-focus');
       stack.style.removeProperty('--right-stack-safe-top');
       stack.style.removeProperty('--right-stack-max-height');
       for (const panel of panels) panel.style.removeProperty('--right-panel-allocated-height');
       stack.dataset.layoutMode = 'mobile';
-      const hasExpanded = panels.some((panel) => !panel.classList.contains('collapsed'));
-      if (hasExpanded) {
-        stack.style.top = '8px';
-        stack.style.maxHeight = 'calc(100vh - 16px)';
-        this._promotePanelZ(stack);
-      } else {
-        stack.style.top = '';
-        stack.style.maxHeight = '';
-      }
       return;
     }
 
@@ -6976,7 +7026,7 @@ export class StyleManager {
       ? [preferredExpandedPanel, ...expandedPanelsInDomOrder.filter((panel) => panel !== preferredExpandedPanel)]
       : expandedPanelsInDomOrder;
     const expandedAvailableHeight = Math.max(
-      0,
+      180,
       safeBottom - layoutTop - collapsedHeight - gap * Math.max(0, visiblePanels.length - 1),
     );
     const expandedHeights = allocatePanelStackHeights({
@@ -7191,24 +7241,15 @@ export class StyleManager {
       }
     }
 
-    // The existing narrow-screen or short landscape composition has its own stack.
+    // The existing narrow-screen composition has its own full-width stack.
     // Keep this desktop lane engine from fighting those dedicated rules.
-    if (window.matchMedia('(max-width: 720px)').matches || window.innerHeight <= 600 || window.matchMedia('(max-height: 600px)').matches) {
+    if (window.matchMedia('(max-width: 720px)').matches || (window.innerHeight > 0 && window.innerHeight <= 560)) {
       stack.classList.remove('layout-focus');
       stack.classList.remove('layout-tail');
       stack.style.removeProperty('--left-stack-safe-top');
       stack.style.removeProperty('--left-stack-safe-bottom');
       stack.style.removeProperty('--left-stack-centered-height');
       stack.dataset.layoutMode = 'mobile';
-      const hasExpanded = panels.some((panel) => !panel.classList.contains('collapsed'));
-      if (hasExpanded) {
-        stack.style.top = '8px';
-        stack.style.maxHeight = 'calc(100vh - 16px)';
-        this._promotePanelZ(stack);
-      } else {
-        stack.style.top = '';
-        stack.style.maxHeight = '';
-      }
       for (const panel of panels) {
         panel.removeAttribute('aria-hidden');
         panel.style.removeProperty('--left-panel-allocated-height');
@@ -7350,7 +7391,7 @@ export class StyleManager {
     const topValue = `${topPct.toFixed(3)}vh`;
     const bottomValue = `${bottomPct.toFixed(3)}vh`;
     const expandedAvailableHeight = shouldFocus
-      ? Math.max(0, layoutBottom - layoutTop
+      ? Math.max(180, layoutBottom - layoutTop
         - rowGap * Math.max(0, expandedPanels.length - 1))
       : naturalExpandedHeight;
     const allocatedExpandedHeights = allocatePanelStackHeights({
@@ -7710,6 +7751,7 @@ export class StyleManager {
     }
     if (panelEl.classList.contains('collapsed') === nextCollapsed && !wasAutoCollapsed) {
       this._syncPanelCollapseButton(panelEl);
+      this._syncExpandedPanelStacks();
       if (priorLeftOwner !== this._leftStackPreferredPanelId) {
         this._scheduleLeftPanelLayout({ reconsiderAutoCollapse: true });
       }
@@ -7745,12 +7787,6 @@ export class StyleManager {
       }
     }
     panelEl.classList.toggle('collapsed', nextCollapsed);
-    if (!nextCollapsed) {
-      this._promotePanelZ(panelEl);
-      if (panelEl.parentElement?.id === 'left-panel-stack' || panelEl.parentElement?.id === 'right-context-rail') {
-        this._promotePanelZ(panelEl.parentElement);
-      }
-    }
     if (nextCollapsed && this.cockpitView?.active && panelId === 'data-panel'
         && this._cockpitContextCollapsedForDataPanel) {
       this._cockpitContextCollapsedForDataPanel = false;
@@ -7771,6 +7807,7 @@ export class StyleManager {
     this._scheduleLeftPanelLayout({
       reconsiderAutoCollapse: this._leftPanelStack?.contains(panelEl) === true,
     });
+    this._syncExpandedPanelStacks();
     if (syncShare) this.shareLinkManager?.onPanelStateChange?.();
   }
 
@@ -8957,7 +8994,7 @@ export class StyleManager {
         valueDisplay.textContent = val.toFixed(uMeta.max <= 1 ? 2 : 1);
         // Uniform writes don't auto-render under the idle governor —
         // without this the slider visibly does nothing until the next
-        // camera move (review browser finding). (perf wave 2)
+        // camera move (browser finding). (perf wave 2)
         governorRequestRender('style-param-slider');
         this._syncShareState();
       });
@@ -9630,6 +9667,167 @@ export class StyleManager {
     }
   }
 
+  /** Wire the persistent device GPS location buttons. */
+  _initMyLocationButton() {
+    this._myLocationHandler = () => { void this.flyToDeviceLocation(); };
+    for (const button of [this._myLocationBtn, this._locationGpsBtn]) {
+      button?.addEventListener('click', this._myLocationHandler);
+    }
+  }
+
+  /**
+   * Request device GPS coordinates and fly camera to the user's location.
+   * @returns {Promise<void>}
+   */
+  async flyToDeviceLocation() {
+    const buttons = [this._myLocationBtn, this._locationGpsBtn].filter(Boolean);
+    buttons.forEach((b) => b.classList.add('locating'));
+    this._showToast('Acquiring GPS location...');
+
+    const onLocationSuccess = (lat, lon, accuracy = 0, altitude = 0) => {
+      buttons.forEach((b) => {
+        b.classList.remove('locating');
+        b.classList.add('active');
+        setTimeout(() => b.classList.remove('active'), 3000);
+      });
+
+      this._stampNavigation();
+      interruptCameraMotion('my-location');
+      this._stopOrbit();
+      this.cockpitView?.exit({ restoreTracking: false });
+      if (this.viewer) {
+        this.viewer.trackedEntity = undefined;
+        this.viewer.camera.cancelFlight();
+        this.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      }
+
+      this.flyToLocationCoordinates(lat, lon, {
+        range: 1400,
+        pitch: -45,
+        heading: 0,
+        duration: 2.8,
+        label: 'GPS Location',
+        accuracy,
+        altitude,
+      });
+
+      const accMsg = accuracy > 0 ? ` (±${Math.round(accuracy)}m)` : '';
+      this._showToast(`GPS LOCKED: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°${accMsg}`);
+    };
+
+    const onLocationError = (err) => {
+      buttons.forEach((b) => b.classList.remove('locating'));
+      console.warn('[GPS] Location acquisition failed:', err);
+      if (err?.code === 1) {
+        this._showToast('Location permission denied — enable GPS in settings');
+      } else if (err?.code === 2) {
+        this._showToast('GPS position unavailable — check device GPS');
+      } else if (err?.code === 3) {
+        this._showToast('GPS request timed out');
+      } else {
+        this._showToast('Could not acquire device location');
+      }
+    };
+
+    // 1. Try native Android bridge first for instant cached position
+    try {
+      if (window.AndroidBridge?.getLastKnownLocation) {
+        const raw = window.AndroidBridge.getLastKnownLocation();
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Number.isFinite(parsed?.latitude) && Number.isFinite(parsed?.longitude)) {
+            onLocationSuccess(parsed.latitude, parsed.longitude, parsed.accuracy || 0, parsed.altitude || 0);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[GPS] AndroidBridge location check error:', e);
+    }
+
+    // 2. Query browser/WebView Geolocation API
+    if (!navigator.geolocation) {
+      onLocationError({ code: 2, message: 'Geolocation not supported' });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = position.coords;
+        onLocationSuccess(coords.latitude, coords.longitude, coords.accuracy, coords.altitude);
+      },
+      (error) => {
+        onLocationError(error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000,
+      }
+    );
+  }
+
+  /**
+   * Fly camera to arbitrary geographic coordinates and place a tactical pin.
+   * @param {number} lat - Latitude in degrees
+   * @param {number} lon - Longitude in degrees
+   * @param {object} [options]
+   */
+  flyToLocationCoordinates(lat, lon, {
+    range = 1400,
+    pitch = -45,
+    heading = 0,
+    duration = 2.8,
+    label = 'GPS Location',
+    accuracy = 0,
+    altitude = 0,
+  } = {}) {
+    if (!this.viewer) return;
+
+    if (this._locationMiniCity) this._locationMiniCity.textContent = `📍 ${label}`;
+    if (this._locationMiniPoi) {
+      const accText = accuracy > 0 ? ` · ±${Math.round(accuracy)}m` : '';
+      this._locationMiniPoi.textContent = `${lat.toFixed(5)}°, ${lon.toFixed(5)}°${accText}`;
+    }
+
+    // Add or update GPS tactical target pin
+    if (this.viewer.entities) {
+      if (this._gpsLocationEntity) {
+        this.viewer.entities.remove(this._gpsLocationEntity);
+        this._gpsLocationEntity = null;
+      }
+      const pos = Cesium.Cartesian3.fromDegrees(lon, lat, altitude || 0);
+      this._gpsLocationEntity = this.viewer.entities.add({
+        position: pos,
+        point: {
+          pixelSize: 12,
+          color: Cesium.Color.fromCssColorString('#00ffff'),
+          outlineColor: Cesium.Color.fromCssColorString('#020408'),
+          outlineWidth: 3,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: `📍 MY LOCATION\n${lat.toFixed(4)}°, ${lon.toFixed(4)}°`,
+          font: '11px monospace',
+          fillColor: Cesium.Color.fromCssColorString('#00ffff'),
+          outlineColor: Cesium.Color.fromCssColorString('#020408'),
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    }
+
+    flyToLandmark(this.viewer, lat, lon, {
+      range,
+      pitch,
+      heading,
+      duration,
+    });
+  }
+
   /** Wire the top-center action that clears only manager-owned data layers. */
   _initClearSelectedLayersButton() {
     if (!this._clearSelectedLayersBtn) return;
@@ -9810,7 +10008,7 @@ export class StyleManager {
    */
   /**
    * Wires the DISPLAY-rail "3D" toggle to the flights layer's `models3d` param.
-   * ON by default in `proximity` mode (product invariant 2026-08-22): the fleet
+   * ON by default in `proximity` mode (owner directive 2026-08-22): the fleet
    * renders as 3D glTF models once the camera is zoomed in past the layer's
    * altitude ceiling, and only the nearest MODEL_MAX in view are admitted, so
    * the default costs nothing at globe scale. `all` is the deliberate opt-in;
@@ -10088,15 +10286,17 @@ export class StyleManager {
     if (!this._cctvPanel) return;
     const inner = this._cctvPanel.querySelector('.cctv-panel-inner');
     requestAnimationFrame(() => {
+      if (this._cctvPanel.parentElement?.id === 'right-context-rail') {
+        this._cctvPanel.style.maxHeight = '';
+        if (inner) inner.style.maxHeight = '';
+        this._scheduleRightPanelLayout();
+        return;
+      }
       const rect = this._cctvPanel.getBoundingClientRect();
-      const top = Number.isFinite(rect.top) && rect.top > 0 ? rect.top : 8;
-      const availableHeight = Math.max(160, Math.floor(window.innerHeight - top - 12));
+      const availableHeight = Math.max(190, Math.floor(window.innerHeight - rect.top - 12));
       this._cctvPanel.style.maxHeight = `${availableHeight}px`;
       if (inner) {
         inner.style.maxHeight = `${availableHeight}px`;
-      }
-      if (this._cctvPanel.parentElement?.id === 'right-context-rail') {
-        this._scheduleRightPanelLayout();
       }
     });
   }
@@ -10152,6 +10352,10 @@ export class StyleManager {
     if (this._awarenessClearedHandler) {
       window.removeEventListener('gev:awareness-subject-cleared', this._awarenessClearedHandler);
       this._awarenessClearedHandler = null;
+    }
+    if (this._mapStackChangeHandler) {
+      window.removeEventListener('gev:map-stack-changed', this._mapStackChangeHandler);
+      this._mapStackChangeHandler = null;
     }
     // Invalidate any in-flight Context transaction the same way a newer request
     // would. Without this, a reinstatement already past its awaits could
@@ -10211,6 +10415,15 @@ export class StyleManager {
       this._resetGlobeBtn?.removeEventListener('click', this._globeResetHandler);
       this._cockpitResetGlobeBtn?.removeEventListener('click', this._globeResetHandler);
       this._globeResetHandler = null;
+    }
+    if (this._myLocationHandler) {
+      this._myLocationBtn?.removeEventListener('click', this._myLocationHandler);
+      this._locationGpsBtn?.removeEventListener('click', this._myLocationHandler);
+      this._myLocationHandler = null;
+    }
+    if (this._gpsLocationEntity && this.viewer?.entities) {
+      try { this.viewer.entities.remove(this._gpsLocationEntity); } catch { /* best effort */ }
+      this._gpsLocationEntity = null;
     }
     if (this._clearSelectedLayersBtn && this._clearSelectedLayersHandler) {
       this._clearSelectedLayersBtn.removeEventListener('click', this._clearSelectedLayersHandler);

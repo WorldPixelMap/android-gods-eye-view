@@ -1,18 +1,18 @@
 {
   "name": "gods-eye-view",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A real-time intelligence console for planet Earth — photorealistic 3D globe, live aircraft/ships/satellites/earthquakes/CCTV, and hands-free voice control. Runs in a browser.",
   "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Custom",
   "author": "WorldPixelMap",
-  "homepage": "https://github.com/WorldPixelMap/gods-eye-view#readme",
+  "homepage": "https://github.com/WorldPixelMap/android-gods-eye-view#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/WorldPixelMap/gods-eye-view.git"
+    "url": "https://github.com/WorldPixelMap/android-gods-eye-view.git"
   },
   "bugs": {
-    "url": "https://github.com/WorldPixelMap/gods-eye-view/issues"
+    "url": "https://github.com/WorldPixelMap/android-gods-eye-view/issues"
   },
   "engines": {
     "node": ">=24.14.0 <25 || >=26 <27"
@@ -32,6 +32,7 @@
     "visualization"
   ],
   "scripts": {
+    "doctor": "node scripts/setup-doctor.mjs",
     "dev": "vite",
     "dev:secure": "./scripts/dev-secure.sh",
     "opensky:import": "./scripts/opensky-import-client.sh",

@@ -32,8 +32,15 @@ import {
 } from './renderGovernor.js';
 import { installScopeMask } from './scopeMask.js';
 import { initFirstRunExperience } from './firstRunExperience.js';
-import { KeyStore, KEY_IDS } from './config/keyStore.js';
-import { initConfigModal, openConfigModal } from './config/configModal.js';
+import { initKeySetup } from './keySetup.js';
+import { loadPhotorealisticTileset } from './mapStartup.js';
+import {
+  keyStore,
+  GEV_KEYS,
+  initKeyConfigModal,
+  showKeyConfigModal,
+  TitanLicense,
+} from './androidBridge.js';
 
 initLogoGaze();
 
@@ -75,14 +82,11 @@ async function init() {
   try {
     loaderStatus.textContent = 'Configuring viewer...';
 
-    // Set Cesium Ion token for World Terrain
-    const cesiumToken = KeyStore.getKey(KEY_IDS.CESIUM_ION);
-    if (cesiumToken) {
-      Cesium.Ion.defaultAccessToken = cesiumToken;
-    }
-
-    // Set Google Maps API key for 3D Tiles
-    const googleApiKey = KeyStore.getKey(KEY_IDS.GOOGLE_MAPS);
+    // A direct Google key provides Google 3D plus GEV place search. Cesium ion
+    // can host the same 3D tiles and also powers Bing/world-terrain stacks.
+    const cesiumToken = keyStore.getKey(GEV_KEYS.CESIUM_ION);
+    const googleApiKey = keyStore.getKey(GEV_KEYS.GOOGLE_MAPS);
+    if (cesiumToken) Cesium.Ion.defaultAccessToken = cesiumToken;
     if (googleApiKey) {
       Cesium.GoogleMaps.defaultApiKey = googleApiKey;
       window.__GOOGLE_MAPS_API_KEY__ = googleApiKey;
@@ -136,11 +140,13 @@ async function init() {
     // Required by each source's license (ODbL, CC BY-NC-SA, NASA FIRMS, etc.);
     // strings are verbatim from DATA_SOURCES.md. Static + always-present in the
     // expandable bottom-left credit lightbox (showOnScreen=false), so they never
-    // clutter the on-globe attribution line.
+    // clutter the on-globe line. See docs/pre-ship-audit-2026-07-01.md H11.
     registerDataCredits(viewer);
 
-    // Hide Cesium's default globe when photoreal is available; otherwise show it for keyless OSM
-    viewer.scene.globe.show = !googleApiKey;
+    // Hide Cesium's default globe — Google Photorealistic 3D Tiles provide their own
+    // globe at all LODs (street level → orbital). The default globe's 2D imagery
+    // clips through 3D tile buildings at close range.
+    viewer.scene.globe.show = false;
 
     // Keep a sky behind Google 3D Tiles, but soften Cesium's high-intensity
     // default atmosphere. With the globe hidden its bright limb otherwise
@@ -150,42 +156,36 @@ async function init() {
     viewer.scene.skyAtmosphere.saturationShift = -0.12;
     viewer.scene.skyAtmosphere.brightnessShift = -0.08;
 
-    loaderStatus.textContent = googleApiKey ? 'Loading Google 3D Tiles...' : 'Initializing Open-Source Globe (OSM)...';
-    let tileset = null;
-    if (googleApiKey) {
-      try {
-        // Load Google Photorealistic 3D Tiles
-        tileset = await Cesium.createGooglePhotorealistic3DTileset({
-          onlyUsingWithGoogleGeocoder: true,
-        });
-        viewer.scene.primitives.add(tileset);
-        // Google Photorealistic 3D Tiles provide their own terrain/elevation.
-        viewer.scene.globe.show = false;
-      } catch (tileError) {
-        console.warn('[Init] Google 3D Tiles unavailable, falling back to Cesium globe:', tileError);
-        const tileErrorDetail = describeError(tileError);
-        loaderStatus.textContent = `Google 3D Tiles unavailable (${tileErrorDetail}). Continuing in fallback mode...`;
-        // Keep Cesium globe visible as fallback instead of aborting the app.
-        viewer.scene.globe.show = true;
-      }
+    loaderStatus.textContent = googleApiKey || cesiumToken
+      ? 'Loading Google 3D Tiles...'
+      : 'Loading the keyless globe...';
+    const photoreal = await loadPhotorealisticTileset(Cesium, {
+      googleApiKey,
+      cesiumToken,
+    });
+    const tileset = photoreal.tileset;
+    if (tileset) {
+      viewer.scene.primitives.add(tileset);
+      // NOTE: Cesium World Terrain intentionally disabled — conflicts with Google 3D Tiles at high zoom.
+      // Google Photorealistic 3D Tiles provide their own terrain/elevation.
+      viewer.scene.globe.show = false;
+      console.info(`[Init] Google 3D Tiles loaded via ${photoreal.route}.`);
     } else {
-      console.info('[Init] Starting in keyless open-source mode (OSM + Re:Earth Terrain). Tap ⚙️ to add a Google key for 3D Photorealism.');
+      if (photoreal.errors.length) {
+        const tileError = photoreal.errors.at(-1);
+        console.warn('[Init] Google 3D Tiles unavailable, using the keyless globe:', tileError);
+        const tileErrorDetail = describeError(tileError);
+        loaderStatus.textContent = `Google 3D Tiles unavailable (${tileErrorDetail}). Loading the keyless globe...`;
+      }
       viewer.scene.globe.show = true;
     }
 
     loaderStatus.textContent = 'Initializing systems...';
 
-    // Initialize in-app config modal & attach button
-    initConfigModal();
-    const configBtn = document.getElementById('gev-config-btn');
-    if (configBtn) {
-      configBtn.addEventListener('click', () => openConfigModal());
-    }
-
     const mapStackController = new MapStackController(viewer, {
       googleTileset: tileset,
       cesiumToken,
-      initialStack: tileset ? 'photoreal' : 'osm',
+      initialStack: tileset ? 'photoreal' : 'esri-imagery',
       // Task 5 (height-datum fix): rebroadcast stack changes as a window
       // CustomEvent so data layers (CCTV per-regime ground resolution) can
       // react without coupling MapStackController to layer modules. Fires on
@@ -196,7 +196,7 @@ async function init() {
       },
       onError: (message) => console.warn('[MapStack]', message),
     });
-    await mapStackController.setStack(tileset ? 'photoreal' : 'osm', { silent: true });
+    await mapStackController.setStack(tileset ? 'photoreal' : 'esri-imagery', { silent: true });
 
     // Initialize the style manager (post-processing, HUD, locations, share links)
     const styleManager = new StyleManager(viewer, { mapStackController });
@@ -276,6 +276,21 @@ async function init() {
       };
       loadingScreen.addEventListener('transitionend', revealFirstRun, { once: true });
       setTimeout(revealFirstRun, 900);
+    });
+
+    // Provider Settings (the POWER UP chip + dialog). Fire-and-forget: the
+    // module removes its own surface when the dev-server endpoint is absent
+    // (prod builds, non-local visitors), so this costs prod exactly nothing.
+    void initKeySetup();
+
+    // In-App Tactical BYOK Configuration and Titan Hardware License Vault
+    initKeyConfigModal();
+    const configBtn = document.getElementById('gev-config-btn');
+    if (configBtn) {
+      configBtn.addEventListener('click', () => showKeyConfigModal());
+    }
+    TitanLicense.initProtection().catch(err => {
+      console.warn('[TitanLicense] Protection initialization error:', err);
     });
 
     // Expose for debugging

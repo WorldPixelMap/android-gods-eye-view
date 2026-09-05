@@ -19,10 +19,18 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
+import com.worldpixelmap.gev.license.LicenseConfig
+import com.worldpixelmap.gev.license.LicenseManager
+import com.worldpixelmap.gev.license.LicenseUI
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private lateinit var licenseManager: LicenseManager
     private val TAG = "GodsEyeView"
     private val PERMISSION_REQUEST_CODE = 1001
 
@@ -36,7 +44,11 @@ class MainActivity : AppCompatActivity() {
 
             // Initialize WebView
             webView = WebView(this)
+            webView.setBackgroundColor(android.graphics.Color.parseColor("#020408"))
             setContentView(webView)
+
+            // Initialize License Protection & Update Engine
+            licenseManager = LicenseManager(this)
 
             // Enable immersive full screen
             hideSystemUI()
@@ -45,6 +57,9 @@ class MainActivity : AppCompatActivity() {
             setupWebClients()
             requestAppPermissions()
             initCctvSourcesInBackground()
+
+            // Startup License & Hardware-Bound Trial Verification
+            checkAppLicensingOnStartup()
 
             // Back button dispatcher
             onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -82,10 +97,13 @@ class MainActivity : AppCompatActivity() {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.setSupportZoom(false)
+        settings.setGeolocationEnabled(true)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
+
+        WebView.setWebContentsDebuggingEnabled(true)
 
         // Add JavaScript interface for native bridge
         webView.addJavascriptInterface(WebAppInterface(), "AndroidBridge")
@@ -191,43 +209,94 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleAssetRequest(uri: Uri): WebResourceResponse? {
-        val path = uri.path ?: return null
-        val relativePath = path.removePrefix("/")
-
-        if (relativePath.startsWith("api/")) return null
-
-        val assetPath = if (relativePath.startsWith("assets/www/")) {
-            relativePath.substring("assets/".length)
-        } else if (relativePath.startsWith("assets/")) {
-            relativePath
-        } else {
-            "www/$relativePath"
+        val host = uri.host ?: ""
+        if (host.isNotEmpty() && host != "appassets.androidplatform.net") {
+            return null
         }
 
-        return try {
-            val stream = assets.open(assetPath)
-            val mimeType = when {
-                assetPath.endsWith(".html") -> "text/html"
-                assetPath.endsWith(".js") || assetPath.endsWith(".mjs") -> "application/javascript"
-                assetPath.endsWith(".css") -> "text/css"
-                assetPath.endsWith(".json") || assetPath.endsWith(".geojson") || assetPath.endsWith(".geojsonl") -> "application/json"
-                assetPath.endsWith(".svg") -> "image/svg+xml"
-                assetPath.endsWith(".png") -> "image/png"
-                assetPath.endsWith(".jpg") || assetPath.endsWith(".jpeg") -> "image/jpeg"
-                assetPath.endsWith(".glb") || assetPath.endsWith(".gltf") -> "model/gltf-binary"
-                assetPath.endsWith(".wasm") -> "application/wasm"
-                assetPath.endsWith(".pbf") -> "application/x-protobuf"
-                else -> "application/octet-stream"
+        val rawPath = uri.path ?: return null
+        val cleanPath = rawPath.removePrefix("/")
+
+        // Proxy endpoints are handled by handleApiProxy
+        if (cleanPath.startsWith("api/") || cleanPath.contains("/api/")) {
+            return null
+        }
+
+        val sanitized = cleanPath.substringBefore('?').substringBefore('#')
+
+        // Build prioritized candidate paths inside APK assets:
+        val candidates = mutableListOf<String>()
+
+        if (sanitized.isEmpty() || sanitized == "index.html") {
+            candidates.add("www/index.html")
+        }
+
+        if (sanitized.startsWith("assets/www/")) {
+            candidates.add("www/" + sanitized.removePrefix("assets/www/"))
+        }
+
+        if (sanitized.startsWith("www/")) {
+            candidates.add(sanitized)
+        }
+
+        // Vite /assets/ and web root assets are located inside assets/www/ in APK
+        candidates.add("www/$sanitized")
+        candidates.add(sanitized)
+
+        for (assetPath in candidates.distinct()) {
+            try {
+                val stream = assets.open(assetPath)
+                val mimeType = getAssetMimeType(assetPath)
+                val isText = assetPath.endsWith(".html") ||
+                             assetPath.endsWith(".js") ||
+                             assetPath.endsWith(".mjs") ||
+                             assetPath.endsWith(".css") ||
+                             assetPath.endsWith(".json") ||
+                             assetPath.endsWith(".geojson") ||
+                             assetPath.endsWith(".geojsonl") ||
+                             assetPath.endsWith(".svg") ||
+                             assetPath.endsWith(".xml") ||
+                             assetPath.endsWith(".txt")
+                val encoding = if (isText) "UTF-8" else null
+                val cacheControl = if (assetPath.endsWith(".html")) "no-cache" else "public, max-age=31536000"
+                val headers = mapOf(
+                    "Access-Control-Allow-Origin" to "*",
+                    "Access-Control-Allow-Methods" to "GET, POST, OPTIONS",
+                    "Access-Control-Allow-Headers" to "*",
+                    "Cache-Control" to cacheControl
+                )
+                return WebResourceResponse(mimeType, encoding, 200, "OK", headers, stream)
+            } catch (_: Exception) {
+                // Continue trying remaining candidate paths
             }
-            val headers = mapOf(
-                "Access-Control-Allow-Origin" to "*",
-                "Cache-Control" to "public, max-age=31536000"
-            )
-            WebResourceResponse(mimeType, "UTF-8", 200, "OK", headers, stream)
-        } catch (e: Exception) {
-            null
+        }
+
+        Log.w(TAG, "Local asset not found for URI: $uri (tried: $candidates)")
+        return null
+    }
+
+    private fun getAssetMimeType(path: String): String {
+        return when {
+            path.endsWith(".html") -> "text/html"
+            path.endsWith(".js") || path.endsWith(".mjs") -> "application/javascript"
+            path.endsWith(".css") -> "text/css"
+            path.endsWith(".json") || path.endsWith(".geojson") || path.endsWith(".geojsonl") -> "application/json"
+            path.endsWith(".svg") -> "image/svg+xml"
+            path.endsWith(".png") -> "image/png"
+            path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
+            path.endsWith(".webp") -> "image/webp"
+            path.endsWith(".gif") -> "image/gif"
+            path.endsWith(".glb") || path.endsWith(".gltf") -> "model/gltf-binary"
+            path.endsWith(".wasm") -> "application/wasm"
+            path.endsWith(".pbf") -> "application/x-protobuf"
+            path.endsWith(".woff2") -> "font/woff2"
+            path.endsWith(".woff") -> "font/woff"
+            path.endsWith(".ttf") -> "font/ttf"
+            path.endsWith(".otf") -> "font/otf"
+            else -> "application/octet-stream"
         }
     }
+
 
     private data class CacheEntry(val timestamp: Long, val contentType: String, val data: ByteArray)
     private val apiCache = java.util.concurrent.ConcurrentHashMap<String, CacheEntry>()
@@ -247,11 +316,21 @@ class MainActivity : AppCompatActivity() {
 
         // Handle endpoints that don't need network
         if (apiPath.startsWith("/api/tomtom/status")) {
-            val json = "{\"hasKey\":false,\"status\":\"simulation\",\"dailyCount\":0,\"budget\":40000}"
+            val key = uri.getQueryParameter("key") ?: request?.requestHeaders?.get("x-tomtom-key")
+            val hasKey = !key.isNullOrBlank()
+            val json = "{\"hasKey\":$hasKey,\"status\":\"${if (hasKey) "live" else "simulation"}\",\"dailyCount\":0,\"budget\":40000}"
             return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
         }
-        if (apiPath.startsWith("/api/firms/status") || apiPath.startsWith("/api/ais-live")) {
-            val json = "{\"hasKey\":false,\"status\":\"missing-key\"}"
+        if (apiPath.startsWith("/api/firms/status")) {
+            val key = uri.getQueryParameter("key") ?: request?.requestHeaders?.get("x-firms-map-key")
+            val hasKey = !key.isNullOrBlank()
+            val json = "{\"hasKey\":$hasKey,\"status\":\"${if (hasKey) "configured" else "missing-key"}\"}"
+            return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+        }
+        if (apiPath.startsWith("/api/ais-live")) {
+            val key = uri.getQueryParameter("key")
+            val hasKey = !key.isNullOrBlank()
+            val json = "{\"hasKey\":$hasKey,\"status\":\"${if (hasKey) "configured" else "missing-key"}\",\"rows\":[]}"
             return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
         }
         if (apiPath.startsWith("/api/realtime/debug-log")) {
@@ -355,6 +434,33 @@ class MainActivity : AppCompatActivity() {
                 upstreamUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
                 mimeType = "application/json"
                 ttlMs = 120000L // 2 minutes
+            }
+            apiPath.startsWith("/api/tomtom/flow/") -> {
+                val key = uri.getQueryParameter("key") ?: request?.requestHeaders?.get("x-tomtom-key")
+                if (key.isNullOrBlank()) {
+                    val json = "{\"error\":\"no_key\"}"
+                    return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 503, "Service Unavailable")
+                }
+                val match = Regex("""^/api/tomtom/flow/(\d+)/(\d+)/(\d+)\.pbf$""").find(apiPath)
+                if (match != null) {
+                    val (z, x, y) = match.destructured
+                    upstreamUrl = "https://api.tomtom.com/traffic/map/4/tile/flow/relative/$z/$x/$y.pbf?key=${java.net.URLEncoder.encode(key, "UTF-8")}"
+                    mimeType = "application/x-protobuf"
+                    ttlMs = 120000L
+                } else {
+                    val json = "{\"error\":\"invalid_tile\"}"
+                    return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 400, "Bad Request")
+                }
+            }
+            apiPath == "/api/firms" || apiPath.startsWith("/api/firms?") -> {
+                val key = uri.getQueryParameter("key") ?: request?.requestHeaders?.get("x-firms-map-key")
+                if (key.isNullOrBlank()) {
+                    val json = "{\"error\":\"no_key\"}"
+                    return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 503, "Service Unavailable")
+                }
+                upstreamUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/${java.net.URLEncoder.encode(key, "UTF-8")}/VIIRS_SNPP_NRT/world/2"
+                mimeType = "text/csv"
+                ttlMs = 1800000L
             }
             apiPath.startsWith("/api/cctv/sources") -> {
                 return handleCctvSources()
@@ -886,7 +992,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadWebApp() {
-        webView.loadUrl("https://appassets.androidplatform.net/assets/www/index.html")
+        webView.loadUrl("https://appassets.androidplatform.net/index.html")
     }
 
     private fun requestAppPermissions() {
@@ -937,6 +1043,86 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Startup License & Trial Validation Routine
+     */
+    private fun checkAppLicensingOnStartup() {
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                if (licenseManager.isActivated()) {
+                    Log.d(TAG, "Device is registered with license: ${licenseManager.getLicenseKey()}. Running heartbeat check.")
+                    val verifyResult = licenseManager.verify()
+                    if (!verifyResult.success && verifyResult.status in listOf("UNBOUND", "EXPIRED", "SUSPENDED", "REVOKED", "OFFLINE_EXPIRED")) {
+                        Log.w(TAG, "License verification invalidated device: ${verifyResult.status}")
+                        LicenseUI.showActivationDialog(
+                            this@MainActivity,
+                            licenseManager,
+                            isCancelable = false,
+                            isTrialExpired = true,
+                            onActivated = {
+                                checkAppLicensingOnStartup()
+                            }
+                        )
+                        return@launch
+                    }
+
+                    // Background update check
+                    val updateResult = licenseManager.checkUpdate()
+                    if (updateResult.isUpdateAvailable) {
+                        LicenseUI.showUpdateDialog(this@MainActivity, updateResult)
+                    }
+                } else {
+                    Log.d(TAG, "No active license key found. Querying hardware-bound trial status.")
+                    val trialResult = licenseManager.checkTrial()
+                    if (trialResult.isHandshakeRequired) {
+                        Log.w(TAG, "One-time initial online setup required. Displaying handshake setup gate.")
+                        LicenseUI.showInitialHandshakeDialog(
+                            this@MainActivity,
+                            licenseManager,
+                            onHandshakeSuccess = {
+                                checkAppLicensingOnStartup()
+                            }
+                        )
+                    } else if (trialResult.trialActive && trialResult.daysLeft > 0) {
+                        LicenseUI.showTrialPopup(
+                            this@MainActivity,
+                            licenseManager,
+                            daysLeft = trialResult.daysLeft,
+                            onActivateNow = {
+                                LicenseUI.showActivationDialog(
+                                    this@MainActivity,
+                                    licenseManager,
+                                    isCancelable = true,
+                                    isTrialExpired = false
+                                )
+                            },
+                            onDismiss = {
+                                Log.d(TAG, "Continuing with active trial session (${trialResult.daysLeft} days remaining).")
+                            }
+                        )
+                    } else {
+                        Log.w(TAG, "Hardware-bound trial has expired or ended. Locking application access.")
+                        LicenseUI.showHardLockoutDialog(
+                            this@MainActivity,
+                            licenseManager,
+                            onActivated = {
+                                checkAppLicensingOnStartup()
+                            }
+                        )
+                    }
+
+                    // Also check for updates
+                    val updateResult = licenseManager.checkUpdate()
+                    if (updateResult.isUpdateAvailable) {
+                        LicenseUI.showUpdateDialog(this@MainActivity, updateResult)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in checkAppLicensingOnStartup: ${e.message}", e)
+            }
+        }
+    }
+
     inner class WebAppInterface {
         @JavascriptInterface
         fun showToast(message: String) {
@@ -948,6 +1134,147 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun isAndroid(): Boolean {
             return true
+        }
+
+        @JavascriptInterface
+        fun getLastKnownLocation(): String? {
+            try {
+                if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    return null
+                }
+                val locationManager = getSystemService(LOCATION_SERVICE) as? android.location.LocationManager ?: return null
+                var bestLocation: android.location.Location? = null
+                for (provider in locationManager.getProviders(true)) {
+                    val l = locationManager.getLastKnownLocation(provider) ?: continue
+                    if (bestLocation == null || l.accuracy < bestLocation.accuracy) {
+                        bestLocation = l
+                    }
+                }
+                if (bestLocation != null) {
+                    val obj = org.json.JSONObject()
+                    obj.put("latitude", bestLocation.latitude)
+                    obj.put("longitude", bestLocation.longitude)
+                    obj.put("altitude", bestLocation.altitude)
+                    obj.put("accuracy", bestLocation.accuracy)
+                    return obj.toString()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error obtaining last known location: ${e.message}")
+            }
+            return null
+        }
+
+        @JavascriptInterface
+        fun getLicenseInfo(): String {
+            return licenseManager.getLicenseStateInfo().toJson().toString()
+        }
+
+        @JavascriptInterface
+        fun isActivated(): Boolean {
+            return licenseManager.isActivated()
+        }
+
+        @JavascriptInterface
+        fun isTrialInitialized(): Boolean {
+            return licenseManager.currentStorage.isTrialInitialized()
+        }
+
+        @JavascriptInterface
+        fun showInitialHandshakeDialog() {
+            runOnUiThread {
+                LicenseUI.showInitialHandshakeDialog(this@MainActivity, licenseManager) {
+                    checkAppLicensingOnStartup()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun showHardLockoutDialog() {
+            runOnUiThread {
+                LicenseUI.showHardLockoutDialog(this@MainActivity, licenseManager) {
+                    checkAppLicensingOnStartup()
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun showActivationDialog() {
+            runOnUiThread {
+                LicenseUI.showActivationDialog(this@MainActivity, licenseManager, isCancelable = true)
+            }
+        }
+
+        @JavascriptInterface
+        fun showLicenseManagementDialog() {
+            runOnUiThread {
+                LicenseUI.showLicenseStatusDialog(this@MainActivity, licenseManager)
+            }
+        }
+
+        @JavascriptInterface
+        fun showUpdateDialog() {
+            runOnUiThread {
+                CoroutineScope(Dispatchers.Main).launch {
+                    val update = licenseManager.checkUpdate()
+                    if (update.isUpdateAvailable) {
+                        LicenseUI.showUpdateDialog(this@MainActivity, update)
+                    } else {
+                        Toast.makeText(this@MainActivity, "You have the latest version (v${LicenseConfig.APP_VERSION})", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun checkForUpdates() {
+            runOnUiThread {
+                CoroutineScope(Dispatchers.Main).launch {
+                    val update = licenseManager.checkUpdate()
+                    if (update.isUpdateAvailable) {
+                        LicenseUI.showUpdateDialog(this@MainActivity, update)
+                    } else if (update.success) {
+                        Toast.makeText(this@MainActivity, "✓ Up to date (v${LicenseConfig.APP_VERSION})", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "Could not reach update server.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun openStoreUrl() {
+            try {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(LicenseConfig.STORE_URL)).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(browserIntent)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to open store URL: ${e.message}")
+            }
+        }
+
+        @JavascriptInterface
+        fun openPortalUrl() {
+            try {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(LicenseConfig.PORTAL_URL)).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                startActivity(browserIntent)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to open portal URL: ${e.message}")
+            }
+        }
+
+        @JavascriptInterface
+        fun deactivateLicense() {
+            runOnUiThread {
+                CoroutineScope(Dispatchers.Main).launch {
+                    licenseManager.deactivate()
+                    Toast.makeText(this@MainActivity, "Device unlinked.", Toast.LENGTH_SHORT).show()
+                    LicenseUI.showActivationDialog(this@MainActivity, licenseManager, isCancelable = false, isTrialExpired = true)
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 import { PbfReader } from 'pbf';
 import { VectorTile } from '@mapbox/vector-tile';
 import { tilesForBounds } from './tomtomTiles.js';
+import { keyStore, GEV_KEYS } from '../androidBridge.js';
 
 /**
  * @file TomTom traffic-flow vector-tile client: fetch + MVT decode.
@@ -132,8 +133,34 @@ export async function fetchFlowForBounds(bounds, { signal, zoom = 12 } = {}) {
     if (cached && now - cached.at < DECODE_CACHE_TTL_MS) return cached.segments;
 
     _tilesFetched += 1;
-    const res = await fetch(`/api/tomtom/flow/${z}/${x}/${y}.pbf`, { signal });
-    if (!res.ok) throw new Error(`flow tile ${key}: HTTP ${res.status}`);
+    let userKey = '';
+    try {
+      userKey = keyStore?.getKey?.(GEV_KEYS?.TOMTOM || 'TOMTOM_API_KEY') || '';
+    } catch {}
+
+    const proxyUrl = userKey
+      ? `/api/tomtom/flow/${z}/${x}/${y}.pbf?key=${encodeURIComponent(userKey)}`
+      : `/api/tomtom/flow/${z}/${x}/${y}.pbf`;
+    const headers = userKey ? { 'X-TomTom-Key': userKey } : {};
+
+    let res;
+    try {
+      res = await fetch(proxyUrl, { headers, signal });
+    } catch (err) {
+      if (err?.name === 'AbortError' || signal?.aborted) throw err;
+      res = null;
+    }
+    if ((!res || !res.ok) && userKey) {
+      // Direct TomTom tile fallback for client-only / Android environments
+      try {
+        const directUrl = `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/${z}/${x}/${y}.pbf?key=${encodeURIComponent(userKey)}`;
+        res = await fetch(directUrl, { signal });
+      } catch (err) {
+        if (err?.name === 'AbortError' || signal?.aborted) throw err;
+        res = null;
+      }
+    }
+    if (!res || !res.ok) throw new Error(`flow tile ${key}: HTTP ${res?.status || 'network error'}`);
     const segments = decodeFlowTile(await res.arrayBuffer(), z, x, y);
     cacheSet(key, { at: Date.now(), segments });
     return segments;

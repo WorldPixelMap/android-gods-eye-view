@@ -53,6 +53,15 @@ function copyRecursiveSync(src, dest) {
 
 copyRecursiveSync(distDir, androidAssetsDir);
 
+// 3b. Also sync dist/assets to Android assets/assets for AssetsPathHandler fallback
+const rootAssetsDir = path.resolve(rootDir, 'Android/app/src/main/assets/assets');
+if (fs.existsSync(rootAssetsDir)) {
+  fs.rmSync(rootAssetsDir, { recursive: true, force: true });
+}
+if (fs.existsSync(path.join(distDir, 'assets'))) {
+  copyRecursiveSync(path.join(distDir, 'assets'), rootAssetsDir);
+}
+
 console.log('\n✅ Step 4: Verification complete!');
-console.log(`🎉 Assets successfully synced to: ${androidAssetsDir}`);
+console.log(`🎉 Assets successfully synced to: ${androidAssetsDir} and ${rootAssetsDir}`);
 console.log('📱 Ready to assemble Android APK in Android Studio or via Gradle:\n   cd Android && ./gradlew assembleDebug\n');

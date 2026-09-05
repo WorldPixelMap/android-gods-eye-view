@@ -10,12 +10,20 @@ output/
 .DS_Store
 .gstack/
 3d-models/
+pinokio/ENVIRONMENT
+pinokio/.installed
 
-# Android build outputs and caches
+# Android & Gradle build artifacts
 .gradle/
+build/
 Android/.gradle/
 Android/build/
 Android/app/build/
 Android/local.properties
 Android/.idea/
+.idea/
 *.apk
+*.apk.idsig
+
+# Local XAMPP Suite
+apps_suite/

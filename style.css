@@ -22,7 +22,7 @@
   --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
   --left-stack-x: 52px;
   --right-rail-x: 52px;
-  --left-stack-top: 120px;
+  --left-stack-top: 26vh;
   --left-stack-gap: 72px;
   --left-collapsed-width: 176px;
   --display-panel-expanded-width: 272px;
@@ -425,22 +425,23 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 /* ── Title Bar ────────────────────────────────── */
 #title-bar {
   position: fixed;
-  top: 14px;
-  left: 20px;
+  top: clamp(12px, 2vh, 22px);
+  left: clamp(16px, 2.5vw, 32px);
   z-index: 100;
   pointer-events: none;
   user-select: none;
+  max-width: calc(50vw - 110px);
 }
 
 #title-bar .title-glow {
   position: absolute;
-  top: -10px;
-  left: -10px;
-  width: 140px;
-  height: 50px;
+  top: -16px;
+  left: -16px;
+  width: 160px;
+  height: 60px;
   background: radial-gradient(ellipse, var(--accent-dim) 0%, transparent 70%);
-  filter: blur(14px);
-  opacity: 0.45;
+  filter: blur(16px);
+  opacity: 0.5;
 }
 
 #title-bar h1 {
@@ -448,20 +449,22 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   align-items: center;
   gap: 8px;
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: clamp(13px, 1.5vw, 18px);
   font-weight: 600;
-  letter-spacing: 3.5px;
+  letter-spacing: clamp(2px, 0.3vw, 4px);
   color: var(--text-primary);
   text-shadow: 0 0 20px var(--accent-glow);
   position: relative;
+  white-space: nowrap;
 }
 
 #title-bar .title-logo {
   position: relative;
   display: block;
-  width: 28px;
+  width: clamp(26px, 2.6vw, 34px);
   height: auto;
-  filter: drop-shadow(0 0 8px rgba(0, 246, 255, 0.4));
+  filter: drop-shadow(0 0 10px rgba(0, 246, 255, 0.5));
+  flex-shrink: 0;
 }
 
 #title-bar .title-logo::before,
@@ -537,19 +540,19 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 
 #title-bar .subtitle {
   font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 2.2px;
+  font-size: clamp(7.5px, 0.8vw, 9.5px);
+  letter-spacing: clamp(1.5px, 0.2vw, 2.5px);
   color: var(--text-dim);
   margin-top: 2px;
   text-transform: uppercase;
-  opacity: 0.75;
+  white-space: nowrap;
 }
 
 /* ── Style Indicator ──────────────────────────── */
 #style-indicator {
   position: fixed;
-  top: 14px;
-  right: 20px;
+  top: clamp(12px, 2vh, 22px);
+  right: clamp(16px, 2.5vw, 32px);
   z-index: 100;
   pointer-events: none;
   user-select: none;
@@ -559,8 +562,8 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 #style-indicator .indicator-label {
   display: block;
   font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 2px;
+  font-size: 10px;
+  letter-spacing: 3px;
   color: var(--text-dim);
   text-transform: uppercase;
 }
@@ -568,12 +571,12 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 #style-indicator .indicator-value {
   display: block;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
-  letter-spacing: 3px;
+  letter-spacing: 5px;
   color: var(--accent);
-  margin-top: 1px;
-  text-shadow: 0 0 14px var(--accent-glow);
+  margin-top: 4px;
+  text-shadow: 0 0 20px var(--accent-glow);
   transition: var(--transition-smooth);
 }
 
@@ -617,6 +620,12 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   gap: 12px;
   margin-bottom: 14px;
   padding: 0 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.panel-collapsible.collapsed {
+  cursor: pointer;
 }
 
 .panel-mini-status {
@@ -897,11 +906,6 @@ body.cockpit-mode #cockpit-cloud-effects.active {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  max-height: calc(100vh - 24px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
 }
 
 #pp-toggles:not(.collapsed) > .pp-header-row,
@@ -1240,7 +1244,7 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 
 .map-stack-chip-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
 }
 
@@ -1279,7 +1283,7 @@ body.cockpit-mode #cockpit-cloud-effects.active {
 
 @media (max-width: 620px) {
   .map-stack-chip-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1879,7 +1883,7 @@ body.ui-clean-view #scene-runtime.active {
 /* ── Top-center Globe Actions ────────────────── */
 #top-center-actions {
   position: fixed;
-  top: 32px;
+  top: clamp(12px, 2vh, 22px);
   left: 50%;
   z-index: 100;
   display: flex;
@@ -1924,6 +1928,23 @@ body.ui-clean-view #scene-runtime.active {
 
 #top-center-actions .material-symbols-outlined {
   font-size: 18px;
+}
+
+#my-location-btn.locating .material-symbols-outlined {
+  animation: my-location-pulse 1.2s infinite ease-in-out;
+  color: #00ffff;
+}
+
+#my-location-btn.active {
+  border-color: rgba(0, 255, 255, 0.6);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+  color: #00ffff;
+}
+
+@keyframes my-location-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 #global-loading-status {
@@ -4181,23 +4202,23 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 }
 
 .hud-top-left {
-  top: 48px;
-  left: 20px;
+  top: clamp(66px, 11vh, 120px);
+  left: clamp(16px, 2.5vw, 36px);
 }
 
 .hud-top-right {
-  top: 48px;
-  right: 20px;
+  top: clamp(66px, 11vh, 120px);
+  right: clamp(16px, 2.5vw, 36px);
 }
 
 .hud-bottom-left {
-  bottom: 48px;
-  left: 24px;
+  bottom: clamp(42px, 6.5vh, 56px);
+  left: 36px;
 }
 
 .hud-bottom-right {
-  bottom: 48px;
-  right: 24px;
+  bottom: clamp(28px, 4.5vh, 44px);
+  right: 36px;
 }
 
 .hud-bracket {
@@ -4335,7 +4356,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #intel-hud[data-variant='tactical'] .hud-top-right,
 #intel-hud[data-variant='operator'] .hud-top-left,
 #intel-hud[data-variant='operator'] .hud-top-right {
-  top: 48px;
+  top: clamp(66px, 11vh, 120px);
 }
 
 #intel-hud[data-variant='operator'] .hud-bottom-bar {
@@ -4364,16 +4385,16 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 }
 
 #intel-hud[data-variant='minimal'] .hud-top-left {
-  top: 72px;
+  top: 88px;
 }
 
 #intel-hud[data-variant='minimal'] .hud-bottom-left {
-  bottom: 24px;
+  bottom: 12vh;
 }
 
 #intel-hud[data-variant='minimal'] .hud-bottom-bar {
   display: flex;
-  bottom: 60px;
+  bottom: calc(12vh + 4rem);
 }
 
 #intel-hud[data-variant='minimal'] .hud-summary-wrap {
@@ -4507,6 +4528,24 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   pointer-events: none;
   transition: top var(--transition-fast), max-height var(--transition-fast);
 }
+
+#right-context-rail.has-expanded-panel,
+#right-context-rail:has(> [data-panel-id]:not(.collapsed)),
+#right-context-rail:has(> #cctv-panel:not(.collapsed)),
+#right-context-rail:has(> #global-context-panel:not(.collapsed)),
+#right-context-rail:has(> #pp-toggles:not(.collapsed)) {
+  z-index: 500 !important;
+  pointer-events: none !important;
+}
+
+#right-context-rail.has-expanded-panel > [data-panel-id].collapsed,
+#right-context-rail:has(> [data-panel-id]:not(.collapsed)) > [data-panel-id].collapsed,
+#right-context-rail:has(> #cctv-panel:not(.collapsed)) > :is(#pp-toggles, #global-context-panel).collapsed,
+#right-context-rail:has(> #global-context-panel:not(.collapsed)) > :is(#pp-toggles, #cctv-panel).collapsed,
+#right-context-rail:has(> #pp-toggles:not(.collapsed)) > :is(#cctv-panel, #global-context-panel).collapsed {
+  display: none !important;
+}
+
 #right-context-rail > #pp-toggles,
 #right-context-rail > #cctv-panel,
 #right-context-rail > #global-context-panel {
@@ -4544,21 +4583,15 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   box-sizing: border-box;
 }
 #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner {
-  max-height: calc(100vh - 24px);
+  max-height: 100%;
   overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 #right-context-rail .global-context-panel-inner { max-height: 100%; }
 #right-context-rail #global-context-panel:not(.collapsed) .global-context-panel-inner {
-  max-height: calc(100vh - 24px);
+  max-height: 100%;
   overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 #right-context-rail #global-context-panel.collapsed {
   width: var(--right-context-collapsed-width);
@@ -5151,7 +5184,6 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   position: relative;
   display: flex;
   min-height: 0;
-  max-height: calc(100vh - 24px);
   flex-direction: column;
   padding: 14px 16px 12px;
   border: 1px solid var(--glass-border);
@@ -5160,11 +5192,6 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(24px) saturate(1.4);
   -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 .context-radio-dock {
   position: relative;
@@ -5814,27 +5841,6 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   box-shadow: inset 0 0 0 1px rgba(92, 255, 198, 0.72), 0 0 18px rgba(92, 255, 198, 0.18);
 }
 
-.data-panel-inner {
-  position: relative;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--panel-radius);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 24px);
-  backdrop-filter: blur(24px) saturate(1.4);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
-    0 1px 0 rgba(255, 255, 255, 0.06) inset;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-}
-
 .data-toggle-top {
   display: flex;
   align-items: center;
@@ -6030,9 +6036,9 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #cctv-panel {
   --panel-expanded-width: 360px;
   position: fixed;
-  top: var(--left-stack-top);
-  left: var(--left-stack-x);
-  right: auto;
+  top: var(--right-stack-safe-top, 26vh);
+  right: var(--right-rail-x, 16px);
+  left: auto;
   bottom: auto;
   z-index: 100;
   width: var(--panel-expanded-width);
@@ -6059,7 +6065,6 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   gap: 8px;
   max-height: calc(100vh - 24px);
   overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 212, 255, 0.46) rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(24px) saturate(1.4);
@@ -6068,8 +6073,6 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
     0 8px 32px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.03) inset,
     0 1px 0 rgba(255, 255, 255, 0.06) inset;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 
 .cctv-panel-inner::-webkit-scrollbar {
@@ -6149,8 +6152,8 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   border-radius: 4px;
   padding: 1px 3px;
   outline: none;
-  -moz-appearance: textfield;
   appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 .cctv-cal-input::-webkit-outer-spin-button,
@@ -6299,7 +6302,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   /* A fixed 16:9 box with the frame CONTAINED inside it. Providers burn their
      timestamp into a corner (TfL top-left, Austin bottom-left) and the old
      150px-tall box was ~2.2:1, so object-fit: cover ate ~18px off the top and
-     bottom — exactly where those stamps live (field test 2026-07-31).
+     bottom — exactly where those stamps live (owner field test 2026-07-31).
      Sources are not all 16:9 either (a TfL frame measures 352x288), so
      `contain` is what actually guarantees nothing is cut; the ratio just keeps
      the panel height stable as you switch cameras. */
@@ -6417,7 +6420,7 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   box-sizing: border-box;
   flex: 0 1 var(--left-panel-allocated-height, auto);
   height: var(--left-panel-allocated-height, auto);
-  max-height: var(--left-panel-allocated-height, calc(100vh - 20px));
+  max-height: var(--left-panel-allocated-height, 100%);
 }
 
 /*
@@ -6436,11 +6439,13 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 #left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner {
   height: 100%;
   max-height: 100%;
+}
+
+#left-panel-stack > #data-panel:not(.collapsed) .data-panel-inner,
+#left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner,
+#left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner {
   overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 
 #left-panel-stack > [data-panel-id]:not(.collapsed) .panel-header {
@@ -6460,13 +6465,224 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   box-shadow: 0 0 7px rgba(0, 212, 255, 0.22);
 }
 
-#right-context-rail > #global-context-panel:not(.collapsed) .global-context-panel-inner {
-  max-height: calc(100vh - 24px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
+/* ── Full-height, top-to-bottom open menu display ──────────────────── */
+#left-panel-stack.has-expanded-panel,
+#left-panel-stack:has(> [data-panel-id]:not(.collapsed)) {
+  top: 10px !important;
+  bottom: 10px !important;
+  max-height: calc(100vh - 20px) !important;
+  height: auto !important;
+  z-index: 250 !important;
+  pointer-events: none !important;
+}
+
+#left-panel-stack.has-expanded-panel > [data-panel-id].collapsed,
+#left-panel-stack:has(> [data-panel-id]:not(.collapsed)) > [data-panel-id].collapsed {
+  display: none !important;
+}
+
+#left-panel-stack.has-expanded-panel > [data-panel-id]:not(.collapsed),
+#left-panel-stack:has(> [data-panel-id]:not(.collapsed)) > [data-panel-id]:not(.collapsed) {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  max-height: calc(100vh - 20px) !important;
+  min-height: 0 !important;
+  width: min(350px, calc(100vw - 20px)) !important;
+  pointer-events: auto !important;
+  flex: 1 1 auto !important;
+}
+
+#left-panel-stack > #data-panel:not(.collapsed) .data-panel-inner {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#left-panel-stack > #data-panel:not(.collapsed) .data-toggle-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding-right: 6px !important;
+}
+
+#left-panel-stack > #scene-panel:not(.collapsed) .scene-panel-inner,
+#left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  box-sizing: border-box !important;
+}
+
+/* ── Expanded Display menu top-to-bottom presentation ──────────────── */
+#pp-toggles:not(.collapsed) {
+  position: fixed !important;
+  top: 10px !important;
+  bottom: 10px !important;
+  right: var(--right-rail-x, 16px) !important;
+  left: auto !important;
+  width: min(var(--pp-expanded-width, 320px), calc(100vw - 20px)) !important;
+  max-height: calc(100vh - 20px) !important;
+  height: auto !important;
+  z-index: 500 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 212, 255, 0.75) rgba(255, 255, 255, 0.08) !important;
+}
+
+#pp-toggles:not(.collapsed) > .compact.pp-header-row {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: rgba(10, 16, 26, 0.95) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  padding-top: 4px !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 4px !important;
+}
+
+/* ── Expanded CCTV menu top-to-bottom presentation ─────────────────── */
+#cctv-panel:not(.collapsed) {
+  position: fixed !important;
+  top: 10px !important;
+  bottom: 10px !important;
+  right: var(--right-rail-x, 16px) !important;
+  left: auto !important;
+  width: min(360px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 20px) !important;
+  height: auto !important;
+  z-index: 500 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+}
+
+#cctv-panel:not(.collapsed) .cctv-panel-inner {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding: 12px 14px 16px !important;
+  box-sizing: border-box !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 212, 255, 0.75) rgba(255, 255, 255, 0.08) !important;
+}
+
+#cctv-panel:not(.collapsed) .panel-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: rgba(10, 16, 26, 0.95) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  padding-top: 4px !important;
+  padding-bottom: 8px !important;
+  margin-bottom: 8px !important;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2) !important;
+}
+
+/* ── Expanded CONTEXT menu top-to-bottom presentation ──────────────── */
+#global-context-panel:not(.collapsed) {
+  position: fixed !important;
+  top: 10px !important;
+  bottom: 10px !important;
+  right: var(--right-rail-x, 16px) !important;
+  left: auto !important;
+  width: min(var(--panel-expanded-width, 340px), calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 20px) !important;
+  height: auto !important;
+  z-index: 500 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+}
+
+#global-context-panel:not(.collapsed) .global-context-panel-inner {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow-y: auto !important;
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding: 12px 14px 16px !important;
+  box-sizing: border-box !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 212, 255, 0.75) rgba(255, 255, 255, 0.08) !important;
+}
+
+#global-context-panel:not(.collapsed) .panel-header {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: rgba(10, 16, 26, 0.95) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  padding-top: 4px !important;
+  padding-bottom: 8px !important;
+  margin-bottom: 8px !important;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2) !important;
+}
+
+/* ── Touch scrollbar styling for expanded panels ──────────────────── */
+.data-toggle-list::-webkit-scrollbar,
+.scene-panel-inner::-webkit-scrollbar,
+.cctv-panel-inner::-webkit-scrollbar,
+#pp-toggles:not(.collapsed)::-webkit-scrollbar,
+.global-context-panel-inner::-webkit-scrollbar {
+  width: 7px;
+}
+
+.data-toggle-list::-webkit-scrollbar-track,
+.scene-panel-inner::-webkit-scrollbar-track,
+.cctv-panel-inner::-webkit-scrollbar-track,
+#pp-toggles:not(.collapsed)::-webkit-scrollbar-track,
+.global-context-panel-inner::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.data-toggle-list::-webkit-scrollbar-thumb,
+.scene-panel-inner::-webkit-scrollbar-thumb,
+.cctv-panel-inner::-webkit-scrollbar-thumb,
+#pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb,
+.global-context-panel-inner::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0, 212, 255, 0.9), rgba(0, 212, 255, 0.4));
+  border-radius: 999px;
+  border: 1px solid rgba(0, 212, 255, 0.45);
 }
 
 #scene-panel .panel-glow {
@@ -6808,7 +7024,7 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
 /* ── Responsive ───────────────────────────────── */
 @media (max-width: 720px) {
   #pp-toggles {
-    --pp-expanded-width: 100%;
+    --pp-expanded-width: 176px;
     position: relative;
     inset: auto;
     gap: 6px;
@@ -6816,7 +7032,7 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
 
   .pp-toggle-group,
   #clean-view-toggle {
-    width: 100%;
+    width: 176px;
   }
 
   .button-grid {
@@ -6831,22 +7047,25 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
   }
 
   #title-bar {
-    top: 12px;
-    left: 14px;
+    top: clamp(10px, 2vh, 16px);
+    left: clamp(12px, 2.5vw, 20px);
+    max-width: calc(50vw - 80px);
   }
 
   #title-bar h1 {
-    font-size: 13px;
-    letter-spacing: 2px;
+    font-size: clamp(12px, 3.2vw, 15px);
+    letter-spacing: clamp(1.5px, 0.4vw, 3px);
     gap: 6px;
   }
 
   #title-bar .title-logo {
-    width: 22px;
+    width: clamp(22px, 5vw, 28px);
   }
 
   #title-bar .subtitle {
-    display: none;
+    font-size: clamp(6.5px, 1.8vw, 8px);
+    letter-spacing: clamp(1px, 0.3vw, 2px);
+    margin-top: 1px;
   }
 
   #location-bar {
@@ -6910,11 +7129,11 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
     top: auto;
     left: 16px;
     bottom: 200px;
-    width: auto;
+    width: 260px;
   }
 
   #data-panel.collapsed {
-    width: auto;
+    width: 260px;
   }
 
   #cctv-panel {
@@ -6935,7 +7154,7 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
      letterboxes inside the shorter box. */
   #cctv-frame {
     aspect-ratio: auto;
-    height: 140px;
+    height: 120px;
   }
 
   .cctv-frame-wrap {
@@ -6955,13 +7174,39 @@ body.scene-playback-mode :is(#clear-selected-layers, #reset-globe-view) {
   }
 
   #left-panel-stack {
-    top: 110px;
+    top: 70px;
     right: 16px;
     bottom: calc(50vh + 8px);
     left: 16px;
     width: auto;
     max-height: none;
     overflow-y: auto;
+  }
+
+  #left-panel-stack.has-expanded-panel,
+  #left-panel-stack:has(> [data-panel-id]:not(.collapsed)) {
+    top: 10px !important;
+    bottom: 10px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    max-height: calc(100vh - 20px) !important;
+    z-index: 250 !important;
+    overflow: visible !important;
+  }
+
+  #pp-toggles:not(.collapsed),
+  #cctv-panel:not(.collapsed),
+  #global-context-panel:not(.collapsed) {
+    position: fixed !important;
+    top: 10px !important;
+    bottom: 10px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100vh - 20px) !important;
+    z-index: 500 !important;
   }
 
   #right-context-rail {
@@ -7260,11 +7505,11 @@ body.recording-mode #cesium-credits {
 }
 
 #intel-hud[data-variant='minimal'] .hud-bottom-left {
-  bottom: max(48px, calc(1.5vh + 44px));
+  bottom: calc(2vh + 7.5rem);
 }
 
 #intel-hud[data-variant='minimal'] .hud-bottom-bar {
-  bottom: max(84px, calc(1.5vh + 80px));
+  bottom: calc(2vh + 11.5rem);
 }
 
 @media (max-width: 980px) {
@@ -7291,15 +7536,15 @@ body.recording-mode #cesium-credits {
   }
 
   body:not(.ui-clean-view):not(.recording-mode) #cesium-credits {
-    bottom: calc(2vh + 5rem);
+    bottom: calc(2vh + 9.5rem);
   }
 
   #intel-hud[data-variant='minimal'] .hud-bottom-left {
-    bottom: max(42px, calc(1.5vh + 38px));
+    bottom: calc(2vh + 12rem);
   }
 
   #intel-hud[data-variant='minimal'] .hud-bottom-bar {
-    bottom: max(78px, calc(1.5vh + 74px));
+    bottom: calc(2vh + 16rem);
   }
 }
 
@@ -7321,6 +7566,16 @@ body.recording-mode #cesium-credits {
 
   #left-panel-stack {
     bottom: calc(50vh + 8px);
+  }
+
+  #left-panel-stack.has-expanded-panel,
+  #left-panel-stack:has(> [data-panel-id]:not(.collapsed)),
+  #cctv-panel:not(.collapsed),
+  #global-context-panel:not(.collapsed),
+  #pp-toggles:not(.collapsed) {
+    top: 8px !important;
+    bottom: 8px !important;
+    max-height: calc(100vh - 16px) !important;
   }
 }
 /* ── Compact accordion command dock ──────────── */
@@ -8140,23 +8395,23 @@ body:not(.ui-clean-view):not(.recording-mode):has(#intel-hud[data-variant='minim
 }
 
 #intel-hud[data-variant='tactical'] .hud-bottom-left,
-#intel-hud[data-variant='tactical'] .hud-bottom-right,
 #intel-hud[data-variant='operator'] .hud-bottom-left,
+#intel-hud[data-variant='minimal'] .hud-bottom-left {
+  bottom: clamp(42px, 6.5vh, 56px);
+}
+
+#intel-hud[data-variant='tactical'] .hud-bottom-right,
 #intel-hud[data-variant='operator'] .hud-bottom-right {
-  bottom: max(48px, calc(1.5vh + 44px));
+  bottom: clamp(28px, 4.5vh, 44px);
 }
 
 #intel-hud[data-variant='operator'] .hud-bottom-bar {
-  bottom: max(84px, calc(1.5vh + 80px));
+  bottom: calc(2vh + 9.8rem);
   width: min(48vw, 680px);
 }
 
-#intel-hud[data-variant='minimal'] .hud-bottom-left {
-  bottom: max(48px, calc(1.5vh + 44px));
-}
-
 #intel-hud[data-variant='minimal'] .hud-bottom-bar {
-  bottom: max(84px, calc(1.5vh + 80px));
+  bottom: calc(2vh + 9rem);
 }
 
 @media (max-width: 900px) {
@@ -8187,6 +8442,101 @@ body:not(.ui-clean-view):not(.recording-mode):has(#intel-hud[data-variant='minim
 
   #left-panel-stack {
     bottom: calc(50vh + 8px);
+  }
+
+  #left-panel-stack.has-expanded-panel,
+  #left-panel-stack:has(> [data-panel-id]:not(.collapsed)),
+  #cctv-panel:not(.collapsed),
+  #global-context-panel:not(.collapsed),
+  #pp-toggles:not(.collapsed) {
+    top: 8px !important;
+    bottom: 8px !important;
+    max-height: calc(100vh - 16px) !important;
+    z-index: 500 !important;
+  }
+}
+
+@media (max-height: 600px) {
+  #intel-hud[data-variant='tactical'] .hud-top-left,
+  #intel-hud[data-variant='tactical'] .hud-top-right,
+  #intel-hud[data-variant='operator'] .hud-top-left,
+  #intel-hud[data-variant='operator'] .hud-top-right,
+  .hud-top-left,
+  .hud-top-right {
+    top: clamp(54px, 11vh, 68px) !important;
+  }
+
+  #intel-hud .hud-content {
+    font-size: 11px !important;
+    letter-spacing: 1.4px !important;
+  }
+
+  #intel-hud .hud-classification {
+    font-size: 9.5px !important;
+    letter-spacing: 1.5px !important;
+    margin-bottom: 1px !important;
+  }
+
+  #intel-hud .hud-system {
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
+
+  #intel-hud .hud-mode {
+    font-size: 11px !important;
+    letter-spacing: 2px !important;
+    margin-top: 1px !important;
+    line-height: 1.25 !important;
+  }
+
+  #intel-hud .hud-summary-wrap {
+    margin-top: 2px !important;
+  }
+
+  #intel-hud .hud-summary-label {
+    font-size: 8px !important;
+    line-height: 1.2 !important;
+  }
+
+  #intel-hud .hud-summary {
+    font-size: 9.5px !important;
+    min-height: 12px !important;
+    line-height: 1.2 !important;
+  }
+
+  #intel-hud .hud-rec {
+    font-size: 11px !important;
+    letter-spacing: 1.4px !important;
+  }
+
+  #intel-hud .hud-orbital {
+    font-size: 10px !important;
+    letter-spacing: 1.2px !important;
+    margin-top: 1px !important;
+  }
+
+  #intel-hud[data-variant='tactical'] .hud-bottom-left,
+  #intel-hud[data-variant='operator'] .hud-bottom-left,
+  #intel-hud[data-variant='minimal'] .hud-bottom-left,
+  .hud-bottom-left {
+    bottom: clamp(40px, 8vh, 50px) !important;
+  }
+
+  #intel-hud[data-variant='tactical'] .hud-bottom-right,
+  #intel-hud[data-variant='operator'] .hud-bottom-right,
+  .hud-bottom-right {
+    bottom: clamp(18px, 3.5vh, 28px) !important;
+  }
+
+  #left-panel-stack.has-expanded-panel,
+  #left-panel-stack:has(> [data-panel-id]:not(.collapsed)),
+  #cctv-panel:not(.collapsed),
+  #global-context-panel:not(.collapsed),
+  #pp-toggles:not(.collapsed) {
+    top: 8px !important;
+    bottom: 8px !important;
+    max-height: calc(100vh - 16px) !important;
+    z-index: 500 !important;
   }
 }
 
@@ -9211,133 +9561,358 @@ body.scene-playback-mode #first-run-launcher {
   .first-run-choices { scroll-behavior: auto; }
 }
 
-@media (max-height: 600px) {
-  #title-bar {
-    top: 8px;
-    left: 14px;
-  }
+/* ============================================================
+   POWER UP — in-app key setup (dev server only, src/keySetup.js)
+   Same voice as the first-run launcher: glass card, cyan trim,
+   mono kickers. The chip retires once every key is configured.
+   ============================================================ */
 
-  #title-bar h1 {
-    font-size: 11px;
-    letter-spacing: 2px;
-    gap: 5px;
-  }
+#key-setup-chip {
+  position: fixed;
+  right: 0.9rem;
+  bottom: 0.9rem;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  color: rgba(225, 244, 248, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.09rem;
+  background: linear-gradient(145deg, rgba(10, 27, 37, 0.92), rgba(7, 13, 22, 0.9));
+  border: 1px solid rgba(54, 220, 255, 0.38);
+  border-radius: 0.42rem;
+  box-shadow:
+    0 0.4rem 1.6rem rgba(0, 0, 0, 0.5),
+    0 0 1.2rem rgba(0, 212, 255, 0.07);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
 
-  #title-bar .title-logo {
-    width: 18px;
-  }
+#key-setup-chip:hover,
+#key-setup-chip:focus-visible {
+  background: linear-gradient(145deg, rgba(14, 38, 51, 0.95), rgba(9, 18, 28, 0.93));
+  border-color: rgba(54, 220, 255, 0.7);
+  outline: none;
+  transform: translateY(-1px);
+}
 
-  #title-bar .subtitle {
-    display: none;
-  }
+#key-setup-chip .material-symbols-outlined {
+  color: #55dff5;
+  font-size: 0.95rem;
+}
 
-  #style-indicator {
-    top: 8px;
-    right: 14px;
-  }
+#key-setup-chip[hidden] { display: none; }
 
-  #style-indicator .indicator-label {
-    font-size: 7px;
-    letter-spacing: 1.5px;
-  }
+#key-setup {
+  position: fixed;
+  z-index: 190; /* above the first-run launcher (175), below attribution (200) */
+  top: 50%;
+  left: 50%;
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 1.5rem);
+  max-height: calc(100dvh - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  padding: 1.15rem;
+  overflow: hidden;
+  color: var(--text-primary);
+  background:
+    linear-gradient(145deg, rgba(10, 27, 37, 0.97), rgba(7, 13, 22, 0.95)),
+    rgba(7, 17, 25, 0.96);
+  border: 1px solid rgba(54, 220, 255, 0.42);
+  border-radius: 0.65rem;
+  box-shadow:
+    0 1.4rem 4.5rem rgba(0, 0, 0, 0.72),
+    0 0 2.5rem rgba(0, 212, 255, 0.09),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(28px) saturate(1.25);
+  -webkit-backdrop-filter: blur(28px) saturate(1.25);
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 0.8rem)) scale(0.985);
+  transition: opacity 220ms ease, transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
 
-  #style-indicator .indicator-value {
-    font-size: 10px;
-    letter-spacing: 2px;
-  }
+/* Same cascade note as the launcher: an author display beats [hidden]. */
+#key-setup[hidden] { display: none; }
 
-  #cctv-frame {
-    height: 110px;
-    max-height: 110px;
-    object-fit: contain;
-  }
-  .cctv-frame-wrap {
-    min-height: 0;
-    max-height: 110px;
-  }
+#key-setup.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
 
-  /* Compact landscape HUD layout to prevent collisions */
-  .hud-top-left,
-  #intel-hud[data-variant='tactical'] .hud-top-left,
-  #intel-hud[data-variant='operator'] .hud-top-left,
-  #intel-hud[data-variant='minimal'] .hud-top-left {
-    top: 36px;
-    left: 14px;
-  }
+.key-setup-scanline {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(54, 220, 255, 0.8), transparent);
+  box-shadow: 0 0 1rem rgba(54, 220, 255, 0.45);
+  pointer-events: none;
+}
 
-  .hud-top-right,
-  #intel-hud[data-variant='tactical'] .hud-top-right,
-  #intel-hud[data-variant='operator'] .hud-top-right,
-  #intel-hud[data-variant='minimal'] .hud-top-right {
-    top: 36px;
-    right: 14px;
-  }
+.key-setup-header,
+.key-setup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: rgba(171, 210, 220, 0.6);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1rem;
+  text-transform: uppercase;
+}
 
+.key-setup-kicker { color: rgba(54, 220, 255, 0.86); }
 
-  .hud-bottom-left,
-  #intel-hud[data-variant='tactical'] .hud-bottom-left,
-  #intel-hud[data-variant='operator'] .hud-bottom-left,
-  #intel-hud[data-variant='minimal'] .hud-bottom-left {
-    bottom: 38px;
-    left: 14px;
-  }
+.key-setup-close {
+  display: grid;
+  place-items: center;
+  padding: 0.15rem;
+  color: rgba(171, 210, 220, 0.6);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
 
-  .hud-bottom-right,
-  #intel-hud[data-variant='tactical'] .hud-bottom-right,
-  #intel-hud[data-variant='operator'] .hud-bottom-right,
-  #intel-hud[data-variant='minimal'] .hud-bottom-right {
-    bottom: 38px;
-    right: 14px;
-  }
+.key-setup-close:hover,
+.key-setup-close:focus-visible {
+  color: rgba(225, 244, 248, 0.95);
+  border-color: rgba(54, 220, 255, 0.5);
+  outline: none;
+}
 
-  .hud-classification {
-    font-size: 9px;
-    letter-spacing: 1.5px;
-    margin-bottom: 1px;
-  }
+.key-setup-close .material-symbols-outlined { font-size: 1rem; }
 
-  .hud-system {
-    font-size: 10px;
-    letter-spacing: 1.2px;
-  }
+#key-setup h2 {
+  margin-top: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  font-weight: 500;
+  letter-spacing: -0.045rem;
+}
 
-  .hud-mode {
-    font-size: 12px;
-    letter-spacing: 2px;
-    margin-top: 1px;
-  }
+#key-setup-description {
+  max-width: 31rem;
+  margin-top: 0.3rem;
+  color: rgba(215, 231, 235, 0.66);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
 
-  .hud-summary-wrap {
-    margin-top: 2px;
-    max-width: min(34vw, 300px);
-  }
+#key-setup-description code {
+  padding: 0.05rem 0.25rem;
+  font-size: 0.92em;
+  background: rgba(54, 220, 255, 0.08);
+  border-radius: 0.2rem;
+}
 
-  .hud-summary-label {
-    font-size: 8px;
-    letter-spacing: 1.2px;
-  }
+.key-setup-rows {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: 1rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(54, 220, 255, 0.45) transparent;
+  scrollbar-gutter: stable;
+}
 
-  .hud-summary {
-    font-size: 10px;
-    line-height: 1.2;
-    letter-spacing: 0.8px;
-  }
+.key-setup-rows::-webkit-scrollbar { width: 6px; }
+.key-setup-rows::-webkit-scrollbar-thumb {
+  background: rgba(54, 220, 255, 0.45);
+  border-radius: 3px;
+}
 
-  .hud-content {
-    font-size: 11px;
-    letter-spacing: 1.2px;
-  }
+.key-setup-row {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.6rem 0.7rem;
+  background: rgba(29, 69, 81, 0.14);
+  border: 1px solid rgba(100, 200, 220, 0.15);
+  border-radius: 0.42rem;
+}
 
-  .hud-orbital {
-    font-size: 10px;
-  }
+.key-setup-row[data-set='true'] {
+  background: rgba(30, 81, 57, 0.12);
+  border-color: rgba(84, 227, 156, 0.32);
+}
 
-  .hud-rec {
-    font-size: 11px;
-  }
+.key-setup-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+}
 
-  .hud-left-edge,
-  .hud-right-edge {
-    display: none !important;
-  }
+.key-setup-row-head strong {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08rem;
+}
+
+.key-setup-led {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  background: rgba(148, 178, 188, 0.35);
+  border-radius: 50%;
+}
+
+.key-setup-row[data-set='true'] .key-setup-led {
+  background: #54e39c;
+  box-shadow: 0 0 0.5rem rgba(84, 227, 156, 0.66);
+}
+
+.key-setup-tier { font-size: 0.55rem; }
+
+.key-setup-exposed {
+  padding: 0.05rem 0.3rem;
+  color: rgba(255, 200, 120, 0.75);
+  font-size: 0.5rem;
+  letter-spacing: 0.06rem;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 200, 120, 0.3);
+  border-radius: 0.3rem;
+}
+
+.key-setup-get {
+  margin-left: auto;
+  color: rgba(54, 220, 255, 0.75);
+  font-size: 0.58rem;
+  letter-spacing: 0.08rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.key-setup-get:hover,
+.key-setup-get:focus-visible {
+  color: rgba(54, 220, 255, 1);
+  text-decoration: underline;
+  outline: none;
+}
+
+.key-setup-unlocks {
+  margin: 0;
+  color: rgba(198, 220, 226, 0.6);
+  font-size: 0.66rem;
+}
+
+.key-setup-fields {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.key-setup-fields input {
+  width: 100%;
+  padding: 0.42rem 0.55rem;
+  color: rgba(225, 244, 248, 0.92);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  background: rgba(4, 14, 20, 0.72);
+  border: 1px solid rgba(100, 200, 220, 0.22);
+  border-radius: 0.32rem;
+}
+
+.key-setup-fields input:focus {
+  border-color: rgba(54, 220, 255, 0.65);
+  outline: none;
+}
+
+.key-setup-fields input::placeholder { color: rgba(148, 178, 188, 0.42); }
+
+.key-setup-footer { margin-top: 0.85rem; }
+
+.key-setup-apply {
+  padding: 0.5rem 0.95rem;
+  color: #04141c;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09rem;
+  background: linear-gradient(180deg, #45e0ff, #1fb9dd);
+  border: none;
+  border-radius: 0.38rem;
+  cursor: pointer;
+  transition: filter var(--transition-fast);
+}
+
+.key-setup-apply:hover,
+.key-setup-apply:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+
+.key-setup-apply[aria-disabled='true'] {
+  cursor: wait;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.key-setup-note {
+  min-height: 1.1rem;
+  margin-top: 0.5rem;
+  color: rgba(199, 225, 231, 0.62);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+/* The same exclusive surfaces that hide the launcher hide this surface —
+   nothing about key setup belongs in a recording, a cockpit, or a scene. */
+body.ui-clean-view #key-setup-chip,
+body.recording-mode #key-setup-chip,
+body.cockpit-mode #key-setup-chip,
+body.scene-playback-mode #key-setup-chip,
+body.ui-clean-view #key-setup,
+body.recording-mode #key-setup,
+body.cockpit-mode #key-setup,
+body.scene-playback-mode #key-setup {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  /* Clear the dock. Desktop-first app; this is a courtesy, not a layout. */
+  #key-setup-chip { bottom: 5.8rem; }
+}
+
+/* Provider Settings additions: externally-managed badge + per-row remove. */
+.key-setup-external {
+  padding: 0.05rem 0.3rem;
+  color: rgba(148, 200, 220, 0.7);
+  font-size: 0.5rem;
+  letter-spacing: 0.06rem;
+  text-transform: uppercase;
+  border: 1px solid rgba(148, 200, 220, 0.28);
+  border-radius: 0.3rem;
+  white-space: nowrap;
+}
+
+.key-setup-remove {
+  justify-self: start;
+  padding: 0.28rem 0.55rem;
+  color: rgba(255, 170, 150, 0.8);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.08rem;
+  background: none;
+  border: 1px solid rgba(255, 170, 150, 0.3);
+  border-radius: 0.32rem;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.key-setup-remove:hover,
+.key-setup-remove:focus-visible {
+  color: rgba(255, 190, 170, 1);
+  border-color: rgba(255, 170, 150, 0.65);
+  outline: none;
 }

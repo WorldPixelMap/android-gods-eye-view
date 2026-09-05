@@ -45,6 +45,7 @@ import {
 } from './focusDeemphasis.js';
 import { requestWorldFocus } from '../worldFocus.js';
 import { holdContinuousRender, releaseContinuousRender } from '../renderGovernor.js';
+import { keyStore, GEV_KEYS } from '../androidBridge.js';
 
 const FOCUS_EVIDENCE_DEV = import.meta.env?.DEV === true;
 
@@ -944,9 +945,22 @@ function applyAisFeedSnapshot(viewer, payload) {
 
 function liveApiUrl() {
   const base = import.meta.env?.VITE_AIS_LIVE_API_URL || DEFAULT_API_URL;
-  const url = new URL(base, window.location.origin);
+  const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'http://localhost';
+  const url = new URL(base, origin);
   url.searchParams.set('maxRows', String(renderRowLimit()));
+  const manualKey = keyStore?.getKey?.(GEV_KEYS.AISSTREAM);
+  if (manualKey) {
+    url.searchParams.set('key', manualKey);
+  }
   return url.toString();
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('gev:keys-updated', () => {
+    if (state.enabled && state.viewer) {
+      loadLivePositions(state.viewer);
+    }
+  });
 }
 
 function renderRowLimit() {

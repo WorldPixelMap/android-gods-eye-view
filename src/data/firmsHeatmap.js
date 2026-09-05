@@ -34,6 +34,8 @@ import {
   setOverlaySourceVisible,
 } from '../overlays/worldOverlay.js';
 import { requestWorldFocus } from '../worldFocus.js';
+import { keyStore, GEV_KEYS } from '../androidBridge.js';
+import { parseFirmsCsv, filterTrailing24h } from './firmsCsv.js';
 
 /** Same-origin live-fires proxy (vite.config.js firmsProxy — key stays server-side). */
 const FIRMS_API_URL = '/api/firms';
@@ -188,6 +190,14 @@ export function createFirmsHeatmapLayer({
   const _camPos = new Cesium.Cartesian3();
   const _camDir = new Cesium.Cartesian3();
 
+  const onKeysUpdated = (event) => {
+    const keys = event?.detail?.changedKeys;
+    if (!keys || keys.includes(GEV_KEYS?.NASA_FIRMS || 'FIRMS_MAP_KEY')) {
+      _keyRequired = false;
+      if (_enabled && !_loading) void loadHeatmap();
+    }
+  };
+
   return {
     id,
     name,
@@ -228,12 +238,18 @@ export function createFirmsHeatmapLayer({
       installMoveEndWatcher();
       installClickHandler();
       registerPickOwner(id, (pickedId) => _pickIndexById.has(pickedId));
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('gev:keys-updated', onKeysUpdated);
+      }
       if (!_fires.length && !_loading) await loadHeatmap();
       restoreSpriteOrderOnEnable('firms', viewer);
     },
 
     disable() {
       _enabled = false;
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('gev:keys-updated', onKeysUpdated);
+      }
       clearFireSelection();
       if (_dataSource) _dataSource.show = false;
       if (_billboards) _billboards.show = false;
@@ -320,7 +336,6 @@ export function createFirmsHeatmapLayer({
         lastUpdate: _lastUpdate,
         loading: _loading,
         stale: _stale,
-        keyRequired: _keyRequired,
         error: _keyRequired ? 'KEY REQUIRED' : (_stale ? staleText : _error),
         loadingLabel,
       };
@@ -422,7 +437,40 @@ export function createFirmsHeatmapLayer({
     _loading = true;
 
     try {
-      const response = await fetch(FIRMS_API_URL, { cache: 'no-store' });
+      let userKey = '';
+      try {
+        userKey = keyStore?.getKey?.(GEV_KEYS?.NASA_FIRMS || 'FIRMS_MAP_KEY') || '';
+      } catch {}
+
+      const url = userKey
+        ? `${FIRMS_API_URL}?key=${encodeURIComponent(userKey)}`
+        : FIRMS_API_URL;
+      const headers = userKey ? { 'X-FIRMS-MAP-KEY': userKey } : {};
+
+      let response;
+      try {
+        response = await fetch(url, { headers, cache: 'no-store' });
+      } catch (netErr) {
+        if (userKey) {
+          const directUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(userKey)}/VIIRS_SNPP_NRT/world/2`;
+          response = await fetch(directUrl, { cache: 'no-store' });
+        } else {
+          throw netErr;
+        }
+      }
+
+      if (!response.ok && userKey && (response.status === 503 || response.status === 404)) {
+        try {
+          const directUrl = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${encodeURIComponent(userKey)}/VIIRS_SNPP_NRT/world/2`;
+          const directRes = await fetch(directUrl, { cache: 'no-store' });
+          if (directRes.ok) {
+            response = directRes;
+          }
+        } catch {
+          // keep original response
+        }
+      }
+
       if (!response.ok) {
         let payload = null;
         try {
@@ -437,7 +485,30 @@ export function createFirmsHeatmapLayer({
         throw new Error(`FIRMS HTTP ${response.status}`);
       }
 
-      const payload = await response.json();
+      let payload = null;
+      if (typeof response.json === 'function') {
+        try {
+          payload = await response.json();
+        } catch {
+          // not JSON, check text if available
+        }
+      }
+      if (!payload && typeof response.text === 'function') {
+        const text = await response.text();
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          const parsed = parseFirmsCsv(text);
+          if (parsed) {
+            const fires = filterTrailing24h(parsed, Date.now());
+            payload = {
+              fetchedAt: Date.now(),
+              stale: false,
+              fires,
+            };
+          }
+        }
+      }
       _keyRequired = false;
       _error = null;
       _stale = Boolean(payload?.stale);

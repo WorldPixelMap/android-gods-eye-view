@@ -1,22 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="stylesheet" href="cesium/Widgets/widgets.css">
-  <script src="cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
+  <script src="/cesium/Cesium.js"></script>
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="author" content="WorldPixelMap" />
   <title>God's Eye View</title>
-  <link rel="icon" type="image/png" href="./favicon.png" />
-  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-BsOYHOko.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Cl8Xqa-0.css">
+  <script type="module" crossorigin src="/assets/index-CJ4axCR7.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-a0BZcgwp.css">
 </head>
 <body>
   <div id="cesiumContainer"></div>
@@ -31,7 +31,7 @@
   <!-- Title -->
   <div id="title-bar">
     <div class="title-glow"></div>
-    <h1><span class="title-logo brand-logo" data-logo-gaze data-logo-src="./logo.svg" aria-hidden="true"><img src="./logo.svg" alt="" /></span> <span>GOD'S EYE <span class="title-accent">VIEW</span></span></h1>
+    <h1><span class="title-logo brand-logo" data-logo-gaze data-logo-src="/logo.svg" aria-hidden="true"><img src="/logo.svg" alt="" /></span> <span>GOD'S EYE <span class="title-accent">VIEW</span></span></h1>
     <p class="subtitle">NO PLACE LEFT BEHIND</p>
   </div>
 
@@ -51,6 +51,9 @@
     </button>
     <button id="share-btn" type="button" aria-label="Copy share link" title="Copy share link">
       <span class="share-icon" aria-hidden="true">&#x1F517;</span>
+    </button>
+    <button id="my-location-btn" type="button" aria-label="Go to my GPS location" title="Go to device GPS location">
+      <span class="material-symbols-outlined" aria-hidden="true">my_location</span>
     </button>
     <button id="reset-globe-view" type="button" aria-label="Reset to full globe view" title="Reset camera and return to full globe view">
       <span class="material-symbols-outlined" aria-hidden="true">public</span>
@@ -421,7 +424,7 @@
       <div id="param-sliders"></div>
     </div>
     <div class="pp-toggle-group">
-      <!-- 3D aircraft is DEFAULT-ON in Proximity (product invariant 2026-08-22), so the
+      <!-- 3D aircraft is DEFAULT-ON in Proximity (owner directive 2026-08-22), so the
            button ships lit and the mode row ships open — the same markup-carries-the-default
            convention as #scope-toggle. ui.js re-syncs both from durable layer state, which
            is what flips them back for a share link or a stored session carrying 3D off. -->
@@ -444,7 +447,7 @@
       </button>
       <div class="pp-slider-row visible" id="scope-slider-row">
         <span class="pp-slider-mini-label">Feather</span>
-        <!-- Feather starts at an 11% soft scope-mask edge (final value
+        <!-- Feather starts at an 11% soft scope-mask edge (owner final lock
              2026-08-24, superseding the 08-22 hard-crop and 08-23 8% rulings);
              mirrors SCOPE_FEATHER_RATIO_DEFAULT in src/scopeMask.js. Feather
              softens the black mask edge; label fading is the separate Fade
@@ -499,7 +502,7 @@
         <span class="panel-divider"></span>
       </button>
       <div id="control-panel-popover" class="dock-popover-content">
-      <button class="dock-pin-btn" data-pin-target="control-panel" type="button" aria-label="Pin visual presets" aria-pressed="false" title="Keep visual presets open"><img src="./pin.svg" alt="" /></button>
+      <button class="dock-pin-btn" data-pin-target="control-panel" type="button" aria-label="Pin visual presets" aria-pressed="false" title="Keep visual presets open"><img src="/pin.svg" alt="" /></button>
       <div id="style-buttons" class="button-grid">
         <button class="style-btn active" data-style="normal">
           <span class="btn-icon">◯</span>
@@ -565,12 +568,15 @@
         <div id="location-mini-poi" class="location-mini-poi">Landmark: --</div>
       </div>
       <div class="dock-popover-content">
-        <button class="dock-pin-btn" data-pin-target="location-bar" type="button" aria-label="Pin location tray" aria-pressed="false" title="Keep location tray open"><img src="./pin.svg" alt="" /></button>
+        <button class="dock-pin-btn" data-pin-target="location-bar" type="button" aria-label="Pin location tray" aria-pressed="false" title="Keep location tray open"><img src="/pin.svg" alt="" /></button>
         <div id="poi-row" class="poi-row-container"></div>
         <div class="location-bar-divider" id="location-bar-divider"></div>
         <div class="location-city-row">
           <div id="location-pills" class="location-pills"></div>
           <div class="location-search-wrap">
+            <button id="location-gps-btn" class="search-toggle-btn" type="button" title="Go to my GPS location" aria-label="Go to device GPS location">
+              <span class="material-symbols-outlined" style="font-size: 14px;">my_location</span>
+            </button>
             <button id="search-toggle" class="search-toggle-btn" title="Search any location">
               <span>&#x1F50E;</span>
             </button>
@@ -848,7 +854,7 @@
       <span class="first-run-kicker">MISSION CONTROL · FIRST LAUNCH</span>
     </header>
     <h2 id="first-run-title">Choose your first view</h2>
-    <!-- The card's one persuasive line, final and VERBATIM (2026-08-23)
+    <!-- The card's one persuasive line, owner-authored and VERBATIM (2026-08-23)
          — including the unspaced em dash. The arc it has to carry: this looks
          like something you should not have access to → the sources are all
          public → the data is real. Tile subcopy stays purely functional. -->
@@ -868,7 +874,7 @@
         <span class="material-symbols-outlined" aria-hidden="true">local_fire_department</span>
         <!-- Title text is painted from ENVIRONMENTAL_LABEL_CHOICE at init. -->
         <!-- Subcopy names BOTH feeds this tile turns on, because the launcher
-             optimizes for the fully configured experience (product decision,
+             optimizes for the fully configured experience (owner ruling,
              2026-08-23) — see the mission table in src/firstRunExperience.js. -->
         <span><strong data-first-run-environmental-title>ENVIRONMENTAL</strong><small>Live earthquakes and active fires, from USGS and NASA</small></span>
         <span class="material-symbols-outlined first-run-arrow" aria-hidden="true">arrow_forward</span>
@@ -891,13 +897,39 @@
     <p class="first-run-note" data-first-run-status role="status" aria-live="polite">Tip: the GEV MIC button in the dock lets you talk to the map.</p>
   </aside>
 
+  <!-- POWER UP — in-app key setup. Dev-server only: src/keySetup.js removes
+       both the chip and this dialog outright when /api/setup/status is not
+       there to answer (prod builds, LAN visitors). Rows are rendered from
+       that payload, so the key registry lives in src/keySetupCore.mjs alone. -->
+  <button id="key-setup-chip" type="button" hidden aria-haspopup="dialog" aria-controls="key-setup">
+    <span class="material-symbols-outlined" aria-hidden="true">bolt</span>
+    <span data-key-setup-chip-label>POWER UP</span>
+  </button>
+  <aside id="key-setup" role="dialog" aria-labelledby="key-setup-title" aria-describedby="key-setup-description" hidden>
+    <div class="key-setup-scanline" aria-hidden="true"></div>
+    <header class="key-setup-header">
+      <span class="key-setup-kicker">GROUND STATION · PROVIDER SETTINGS</span>
+      <button type="button" class="key-setup-close" data-key-setup-close aria-label="Close key setup">
+        <span class="material-symbols-outlined" aria-hidden="true">close</span>
+      </button>
+    </header>
+    <h2 id="key-setup-title">Power up the globe</h2>
+    <p id="key-setup-description">The globe already flies keyless. Every key below switches on another real feed — paste one and it's saved into this app's local configuration, then the server restarts itself. Server-side keys stay on this machine; Google Maps and Cesium ion run in the browser and must be provider-restricted. Keys you configured elsewhere are shown but never touched.</p>
+    <div class="key-setup-rows" data-key-setup-rows></div>
+    <div class="key-setup-footer">
+      <button type="button" class="key-setup-apply" data-key-setup-apply>SAVE KEYS</button>
+      <span class="key-setup-hint">ESC to close</span>
+    </div>
+    <p class="key-setup-note" data-key-setup-status role="status" aria-live="polite">The Google Maps key buys the photorealistic planet — everything else stacks on top.</p>
+  </aside>
+
   <!-- Intelligence HUD Overlay -->
   <div id="intel-hud"></div>
 
   <!-- Loading screen -->
   <div id="loading-screen">
     <div class="loader-content">
-      <span class="loader-logo brand-logo" data-logo-gaze data-logo-src="/logo.svg" aria-hidden="true"><img src="./logo.svg" alt="" /></span>
+      <span class="loader-logo brand-logo" data-logo-gaze data-logo-src="/logo.svg" aria-hidden="true"><img src="/logo.svg" alt="" /></span>
       <h2>GOD'S EYE <span class="title-accent">VIEW</span></h2>
       <p class="loader-status">Initializing photorealistic world...</p>
     </div>

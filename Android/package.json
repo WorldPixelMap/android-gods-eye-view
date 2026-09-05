@@ -1,6 +1,6 @@
 {
   "name": "gods-eye-view-android",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Android application build scripts for God's Eye View",
   "type": "module",
   "scripts": {

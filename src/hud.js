@@ -19,6 +19,8 @@ import { CITY_POIS } from './locations.js';
 import { composeLocalityTag } from './hudLocality.js';
 import { ellipsoidalToMslDisplayM, ensureGeoidReady, geoidHeight } from './data/geoid.js';
 import { getBasemapLabelContext } from './voice/gevActions.js';
+import { isHudSummaryUnconfigured } from './hudSummaryResponse.js';
+import { keyStore, GEV_KEYS } from './androidBridge.js';
 
 /** Color palettes keyed by shader mode; applied as CSS custom properties. */
 const HUD_COLORS = {
@@ -658,17 +660,71 @@ export class IntelHUD {
     const timeout = window.setTimeout(() => controller.abort(), 5000);
     this._summaryRequest = controller;
     try {
+      let userKey = '';
+      try {
+        userKey = keyStore?.getKey?.(GEV_KEYS?.OPENAI || 'OPENAI_API_KEY') || '';
+      } catch {}
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (userKey) headers.Authorization = `Bearer ${userKey}`;
+
       const response = await fetch(HUD_SUMMARY_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(context),
         signal: controller.signal,
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.summary) {
-        throw new Error(data?.error || `HTTP ${response.status}`);
+      }).catch(() => null);
+
+      let data = null;
+      if (response && response.ok) {
+        data = await response.json().catch(() => null);
       }
+
       if (revision !== this._summaryRevision) return;
+
+      // Direct client fallback to OpenAI if backend proxy lacks key but user provided a BYOK key
+      if ((!data?.summary || !response?.ok) && userKey) {
+        try {
+          const directRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${userKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are an intelligence HUD recon summarizer. Generate a concise 3-to-5 word tactical description in uppercase. No quotes.',
+                },
+                {
+                  role: 'user',
+                  content: `Context: ${JSON.stringify(context)}`,
+                },
+              ],
+              max_tokens: 25,
+              temperature: 0.3,
+            }),
+            signal: controller.signal,
+          });
+          if (directRes.ok) {
+            const chatPayload = await directRes.json().catch(() => null);
+            const summaryText = chatPayload?.choices?.[0]?.message?.content?.trim();
+            if (summaryText) data = { summary: summaryText };
+          }
+        } catch (directErr) {
+          console.warn('[HUD] Direct OpenAI summary failed:', directErr);
+        }
+      }
+
+      if (response && isHudSummaryUnconfigured(response.status, data) && !data?.summary) {
+        this._setSummaryText(fallbackText, animate);
+        return;
+      }
+      if (!data?.summary) {
+        throw new Error(data?.error || (response ? `HTTP ${response.status}` : 'AI summary unavailable'));
+      }
       this._setSummaryText(data.summary, animate);
     } catch (error) {
       if (error?.name !== 'AbortError') {
