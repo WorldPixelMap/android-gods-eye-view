@@ -20,7 +20,7 @@ Try other Apps: *https://worldpixelmap.in/apps_suite/*
 [![Cesium](https://img.shields.io/badge/Engine-CesiumJS%203D-blue.svg)](https://cesium.com/)
 [![Unit Tests](https://img.shields.io/badge/Unit%20Tests-2680%2B%20Passing-brightgreen.svg)](scripts/run-unit-tests.mjs)
 [![License Server](https://img.shields.io/badge/License%20Server-Titan%20Active-brightgreen.svg)](https://worldpixelmap.in/apps_suite/portal.php)
-[![Release](https://img.shields.io/badge/Release-v1.0.1-orange.svg)](https://github.com/WorldPixelMap/android-gods-eye-view/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.2-orange.svg)](https://github.com/WorldPixelMap/android-gods-eye-view/releases)
 
 ---
 
