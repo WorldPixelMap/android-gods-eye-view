@@ -1,0 +1,36 @@
+node_modules
+dist
+.env
+*.log
+screenshots/
+qa-shots/
+output/
+.gev-logs/
+.gev-cache/
+.DS_Store
+.gstack/
+3d-models/
+pinokio/ENVIRONMENT
+pinokio/.installed
+
+# Android & Gradle build artifacts
+.gradle/
+build/
+Android/.gradle/
+Android/build/
+Android/app/build/
+Android/local.properties
+Android/.idea/
+.idea/
+*.apk
+*.apk.idsig
+
+# Signing keystores & credentials — NEVER commit these
+*.jks
+*.keystore
+keystore.properties
+Android/app/keystore.properties
+local.properties
+
+# Local XAMPP Suite
+apps_suite/

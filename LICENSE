@@ -1,0 +1,47 @@
+WorldPixelMap Software License
+
+Copyright (c) 2026 WorldPixelMap. All rights reserved.
+
+Permission is hereby granted to view, inspect, and evaluate the source code of this software for educational, non-production, and review purposes only.
+
+EXPLICIT PERMISSION REQUIRED:
+Any use, copying, reproduction, modification, branching, merging, distribution,
+sublicensing, commercial exploitation, hosting, or deployment of this software and associated documentation files (the "Software"), in whole or in part, is STRICTLY PROHIBITED without prior written permission and explicit authorization from WorldPixelMap.
+
+To request permission for usage, integration, or licensing, please contact:
+https://github.com/WorldPixelMap/android-gods-eye-view
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+NOTE ON THIRD-PARTY DATA AND ASSETS:
+
+The datasets bundled under src/data/local_data/, and all data fetched from
+third-party providers at runtime, are owned by their respective sources and
+remain subject to their own licenses and terms. Notably:
+
+  - TeleGeography Submarine Cable Map (src/data/local_data/
+    telegeography_submarine_cables/): CC BY-NC-SA 3.0 — NonCommercial +
+    ShareAlike. NOT for commercial use. If you use this project commercially,
+    remove these files or obtain a commercial license from TeleGeography.
+  - Datacenters and Dams (OpenStreetMap / Open Infrastructure Map extracts):
+    Open Database License (ODbL) 1.0 — attribution + share-alike on the data.
+  - NASA FIRMS active-fire snapshot: CC0 / U.S. public domain (citation
+    requested).
+
+Live sources (Google Maps, OpenSky, adsb.lol, AISStream, CelesTrak, USGS,
+OSM Overpass, City of Austin, GBFS) are fetched at runtime under each
+provider's terms; some (e.g. Google Maps, OpenSky) restrict commercial use
+and require you to supply your own credentials.
+
+See DATA_SOURCES.md for the full per-source license + attribution summary.
+
+The 3D models under public/models/ are third-party works and remain under
+their individual licenses. See public/models/README.md for the author, source, license, modification notice, and attribution covering each model file.

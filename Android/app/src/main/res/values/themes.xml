@@ -1,0 +1,14 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme with Dark OSINT Cockpit aesthetic -->
+    <style name="Theme.GodsEyeView" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/gev_accent_green</item>
+        <item name="colorPrimaryVariant">@color/gev_surface</item>
+        <item name="colorOnPrimary">@color/gev_background</item>
+        <item name="colorSecondary">@color/gev_accent_blue</item>
+        <item name="android:statusBarColor">@color/gev_background</item>
+        <item name="android:navigationBarColor">@color/gev_background</item>
+        <item name="android:windowBackground">@color/gev_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>
