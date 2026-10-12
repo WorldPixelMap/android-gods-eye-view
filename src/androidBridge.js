@@ -263,7 +263,7 @@ export const LICENSE_CONFIG = {
   SERVER_URL: 'https://worldpixelmap.in/apps_suite/license.php',
   APP_SLUG: 'agev',
   APP_NAME: "God's Eye View",
-  APP_VERSION: '1.0.2',
+  APP_VERSION: '1.0.3',
   STORE_URL: 'https://worldpixelmap.in/apps_suite/product.php?slug=agev',
   PORTAL_URL: 'https://worldpixelmap.in/apps_suite/portal.php',
   OFFLINE_GRACE_MS: 7 * 24 * 60 * 60 * 1000,

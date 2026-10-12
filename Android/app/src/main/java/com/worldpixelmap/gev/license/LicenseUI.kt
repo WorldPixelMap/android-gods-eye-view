@@ -270,10 +270,14 @@ object LicenseUI {
 
         val buyBtn = Button(activity).apply {
             text = "🛒 Buy License Key"
+            isAllCaps = false
+            includeFontPadding = false
             setTextColor(Color.parseColor(COLOR_GOLD_ACCENT))
             textSize = 12f
+            minHeight = dp(activity, 42)
+            setPadding(dp(activity, 8), dp(activity, 8), dp(activity, 8), dp(activity, 8))
             background = createCardDrawable(COLOR_BG_DARK, COLOR_GOLD_ACCENT, 1, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, dp(activity, 40), 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(0, 0, dp(activity, 6), 0)
             }
             setOnClickListener {
@@ -283,10 +287,14 @@ object LicenseUI {
 
         val portalBtn = Button(activity).apply {
             text = "🖥️ Customer Portal"
+            isAllCaps = false
+            includeFontPadding = false
             setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
             textSize = 12f
+            minHeight = dp(activity, 42)
+            setPadding(dp(activity, 8), dp(activity, 8), dp(activity, 8), dp(activity, 8))
             background = createCardDrawable(COLOR_BG_DARK, COLOR_BORDER, 1, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, dp(activity, 40), 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(dp(activity, 6), 0, 0, 0)
             }
             setOnClickListener {
@@ -356,16 +364,20 @@ object LicenseUI {
         dialog.setCanceledOnTouchOutside(false)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
+        val displayMetrics = activity.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val maxCardWidth = minOf(dp(activity, 460), (screenWidth * 0.92f).toInt())
+
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(activity, 24), dp(activity, 24), dp(activity, 24), dp(activity, 24))
+            setPadding(dp(activity, 20), dp(activity, 20), dp(activity, 20), dp(activity, 20))
             background = createCardDrawable(COLOR_CARD_BG, COLOR_CYAN_ACCENT, 2, dp(activity, 14))
             layoutParams = LinearLayout.LayoutParams(
-                dp(activity, 480),
+                maxCardWidth,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.CENTER
-                setMargins(dp(activity, 16), dp(activity, 16), dp(activity, 16), dp(activity, 16))
+                setMargins(dp(activity, 12), dp(activity, 12), dp(activity, 12), dp(activity, 12))
             }
         }
 
@@ -412,21 +424,31 @@ object LicenseUI {
         }
         card.addView(deviceSub)
 
-        // Buttons Row
+        // Buttons Row (Responsive, no text clipping)
         val buttonsRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(activity, 44)
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(activity, 4)
+            }
         }
 
         val dismissBtn = Button(activity).apply {
             text = "Continue Session"
+            isAllCaps = false
+            includeFontPadding = false
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-            textSize = 12f
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            minHeight = dp(activity, 46)
+            minimumHeight = dp(activity, 46)
+            setPadding(dp(activity, 12), dp(activity, 10), dp(activity, 12), dp(activity, 10))
             background = createCardDrawable(COLOR_BG_DARK, COLOR_BORDER, 1, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(0, 0, dp(activity, 6), 0)
             }
             setOnClickListener {
@@ -437,11 +459,17 @@ object LicenseUI {
 
         val activateBtn = Button(activity).apply {
             text = "⚡ Activate Now"
+            isAllCaps = false
+            includeFontPadding = false
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_BG_DARK))
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
+            minHeight = dp(activity, 46)
+            minimumHeight = dp(activity, 46)
+            setPadding(dp(activity, 12), dp(activity, 10), dp(activity, 12), dp(activity, 10))
             background = createButtonDrawable(COLOR_CYAN_ACCENT, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.2f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(dp(activity, 6), 0, 0, 0)
             }
             setOnClickListener {
@@ -590,18 +618,24 @@ object LicenseUI {
         // Action Buttons Row
         val btnRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(activity, 42)
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
 
         val updateBtn = Button(activity).apply {
             text = "🔄 Check Updates"
+            isAllCaps = false
+            includeFontPadding = false
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_CYAN_ACCENT))
             textSize = 12f
+            minHeight = dp(activity, 42)
+            setPadding(dp(activity, 8), dp(activity, 8), dp(activity, 8), dp(activity, 8))
             background = createCardDrawable(COLOR_BG_DARK, COLOR_CYAN_MUTED, 1, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(0, 0, dp(activity, 6), 0)
             }
             setOnClickListener {
@@ -612,10 +646,15 @@ object LicenseUI {
 
         val portalBtn = Button(activity).apply {
             text = "🖥️ Device Portal"
+            isAllCaps = false
+            includeFontPadding = false
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
             textSize = 12f
+            minHeight = dp(activity, 42)
+            setPadding(dp(activity, 8), dp(activity, 8), dp(activity, 8), dp(activity, 8))
             background = createCardDrawable(COLOR_BG_DARK, COLOR_BORDER, 1, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(dp(activity, 6), 0, 0, 0)
             }
             setOnClickListener {
@@ -770,18 +809,27 @@ object LicenseUI {
         // Buttons Row
         val buttonsRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(activity, 46)
-            )
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(activity, 6)
+            }
         }
 
         val laterBtn = Button(activity).apply {
             text = "Remind Later"
+            isAllCaps = false
+            includeFontPadding = false
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-            textSize = 12f
+            textSize = 12.5f
+            minHeight = dp(activity, 46)
+            minimumHeight = dp(activity, 46)
+            setPadding(dp(activity, 12), dp(activity, 10), dp(activity, 12), dp(activity, 10))
             background = createCardDrawable(COLOR_BG_DARK, COLOR_BORDER, 1, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                 setMargins(0, 0, dp(activity, 6), 0)
             }
             setOnClickListener {
@@ -792,11 +840,17 @@ object LicenseUI {
 
         val downloadBtn = Button(activity).apply {
             text = "⬇️ Download & Update"
+            isAllCaps = false
+            includeFontPadding = false
+            gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_BG_DARK))
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
+            minHeight = dp(activity, 46)
+            minimumHeight = dp(activity, 46)
+            setPadding(dp(activity, 12), dp(activity, 10), dp(activity, 12), dp(activity, 10))
             background = createButtonDrawable(COLOR_CYAN_ACCENT, dp(activity, 8))
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.4f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f).apply {
                 setMargins(dp(activity, 6), 0, 0, 0)
             }
             setOnClickListener {
@@ -991,8 +1045,10 @@ object LicenseUI {
         // Connect Button
         val connectBtn = Button(activity).apply {
             text = "📡 Connect & Start Free Trial"
+            isAllCaps = false
+            includeFontPadding = false
             setTextColor(Color.parseColor(COLOR_BG_DARK))
-            textSize = 13f
+            textSize = 13.5f
             typeface = Typeface.DEFAULT_BOLD
             background = createButtonDrawable(COLOR_CYAN_ACCENT, dp(activity, 8))
             layoutParams = LinearLayout.LayoutParams(
@@ -1005,6 +1061,8 @@ object LicenseUI {
         // License Key Alternative
         val licenseBtn = Button(activity).apply {
             text = "🔑 I Have a License Key"
+            isAllCaps = false
+            includeFontPadding = false
             setTextColor(Color.parseColor(COLOR_CYAN_ACCENT))
             textSize = 13f
             typeface = Typeface.DEFAULT_BOLD
