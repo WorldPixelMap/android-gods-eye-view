@@ -1,7 +1,8 @@
 /**
  * Key setup ("POWER UP") — the pure core.
  *
- * One registry, three pure functions, zero dependencies. The dev server's
+ * One registry and pure functions; its only import is the proxy-header check
+ * shared with the other local gates (localRequestGate.mjs). The dev server's
  * /api/setup endpoints (vite.config.js) and the in-app panel (keySetup.js)
  * are both thin shells over this module, so what a key is called, what it
  * unlocks, and how a .env line is written each live in exactly one place.
@@ -11,21 +12,25 @@
  * behavior below unit-testable.
  */
 
+import { hasProxySignals } from './localRequestGate.mjs';
+
 /** Longest accepted key/token value. Real provider keys are all far shorter. */
 export const KEY_SETUP_VALUE_LIMIT = 512;
 
-/** Most env vars accepted in one save. The registry defines nine. */
+/** Most env vars accepted in one save. The registry defines ten. */
 export const KEY_SETUP_UPDATE_LIMIT = 16;
 
 /** Header line written above keys the panel appends to a .env file. */
-export const KEY_SETUP_APPEND_HEADER = '# Keys added by the in-app POWER UP panel';
+export const KEY_SETUP_APPEND_HEADER =
+  '# Keys added by the in-app POWER UP panel';
 
 /**
- * Every key the panel offers, in the order it offers them — most magic per
+ * Provider credentials, in display order — most magic per
  * minute first. `tier` mirrors the README's color legend: 'metered' (🔴) is a
  * billing-enabled account, 'free' (🟡) is a register-and-paste key.
- * `clientExposed` marks the two keys that are injected into the browser
+ * `clientExposed` marks the keys that are injected into the browser
  * bundle by design (restrict them at the provider, per SECURITY.md).
+ * `hidden` keeps advanced configuration out of the panel and missing-key count.
  */
 export const KEY_SETUP_KEYS = Object.freeze([
   Object.freeze({
@@ -38,9 +43,19 @@ export const KEY_SETUP_KEYS = Object.freeze([
     clientExposed: true,
   }),
   Object.freeze({
+    id: 'google-maps-server',
+    title: 'GOOGLE MAPS — SERVER',
+    unlocks: 'Places context + Street View fallback; optional separate key',
+    getUrl:
+      'https://developers.google.com/maps/documentation/places/web-service/get-api-key',
+    envVars: Object.freeze(['GOOGLE_MAPS_SERVER_API_KEY']),
+    tier: 'metered',
+    hidden: true,
+  }),
+  Object.freeze({
     id: 'openai',
     title: 'OPENAI',
-    unlocks: 'Voice control — talk to the planet',
+    unlocks: 'Voice control — API key or ChatGPT OAuth',
     getUrl: 'https://platform.openai.com/api-keys',
     envVars: Object.freeze(['OPENAI_API_KEY']),
     tier: 'metered',
@@ -65,7 +80,7 @@ export const KEY_SETUP_KEYS = Object.freeze([
     id: 'tomtom',
     title: 'TOMTOM',
     unlocks: 'Real live traffic (keyless runs a simulation)',
-    getUrl: 'https://developer.tomtom.com',
+    getUrl: 'https://my.tomtom.com/keys',
     envVars: Object.freeze(['TOMTOM_API_KEY']),
     tier: 'free',
   }),
@@ -87,6 +102,16 @@ export const KEY_SETUP_KEYS = Object.freeze([
     tier: 'free',
   }),
   Object.freeze({
+    id: 'mapillary',
+    title: 'MAPILLARY',
+    unlocks:
+      'Street-level imagery and coverage in the Street Level layer. Free: register an app in the Mapillary developer dashboard and paste its Client Token',
+    getUrl: 'https://www.mapillary.com/dashboard/developers',
+    envVars: Object.freeze(['MAPILLARY_CLIENT_TOKEN']),
+    tier: 'free',
+    clientExposed: true,
+  }),
+  Object.freeze({
     id: 'launch-library',
     title: 'LAUNCH LIBRARY',
     unlocks: 'Higher space-missions request allowance',
@@ -103,12 +128,17 @@ const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
 /** Parse an exact local request authority from a Host header. */
 function localAuthority(hostHeader, protocol) {
-  const raw = String(hostHeader || '').trim().toLowerCase();
+  const raw = String(hostHeader || '')
+    .trim()
+    .toLowerCase();
   const scheme = String(protocol || '').toLowerCase();
-  if (!raw || !['http:', 'https:'].includes(scheme) || /[\s/?#@]/.test(raw)) return null;
+  if (!raw || !['http:', 'https:'].includes(scheme) || /[\s/?#@]/.test(raw))
+    return null;
   try {
     const parsed = new URL(`${scheme}//${raw}`);
-    return LOCAL_HOSTNAMES.has(parsed.hostname.toLowerCase()) ? parsed.origin : null;
+    return LOCAL_HOSTNAMES.has(parsed.hostname.toLowerCase())
+      ? parsed.origin
+      : null;
   } catch {
     return null;
   }
@@ -121,7 +151,9 @@ export function commandCompletedSuccessfully(result) {
 
 /** Parse one RFC-4180-shaped CSV record, sufficient for `whoami /fo csv`. */
 function parseCsvRecord(text) {
-  const source = String(text || '').replace(/^\uFEFF/, '').trim();
+  const source = String(text || '')
+    .replace(/^\uFEFF/, '')
+    .trim();
   if (!source || /[\r\n]/.test(source)) return null;
   const fields = [];
   let field = '';
@@ -166,6 +198,24 @@ export function parseWindowsUserSid(stdout) {
 }
 
 /**
+ * Whether the launcher has sharing on. Every sharing signal the launcher
+ * recognizes (scripts/pinokio-preflight.mjs) counts, so the two sets cannot
+ * drift apart. One DELIBERATE divergence: preflight is a boot check that
+ * treats an empty PINOKIO_SHARE_VAR as sharing-on (fail closed before Start),
+ * but here an empty/unset value is the NORMAL git-clone and Pinokio state, so
+ * a bare/sentinel value is not sharing; only a real tunnel var is.
+ */
+export function isSharingEnabled(env = {}) {
+  const shareVar = String(env.PINOKIO_SHARE_VAR ?? '').trim();
+  return (
+    ['PINOKIO_SHARE_CLOUDFLARE', 'PINOKIO_SHARE_LOCAL'].some((name) =>
+      /^(1|true)$/i.test(String(env[name] || '').trim()),
+    ) ||
+    (shareVar !== '' && shareVar !== '__gev_sharing_disabled__')
+  );
+}
+
+/**
  * The admission gate for the Provider Settings endpoints — pure, exported so
  * every refusal below is pinned by a unit assertion rather than a review note.
  *
@@ -200,9 +250,12 @@ export function admitKeySetupRequest({
   // on this machine, whatever its socket says. Refuse them outright as defense
   // in depth — the shipped tunnel (Pinokio) is force-closed at boot, so these
   // only appear when someone has deliberately fronted the dev server.
-  const PROXY_SIGNALS = ['forwarded', 'via', 'x-forwarded-for', 'x-forwarded-host', 'x-forwarded-port', 'x-forwarded-proto', 'x-real-ip', 'cf-connecting-ip', 'cf-ray'];
-  if (PROXY_SIGNALS.some((name) => String(proxyHeaders[name] || '').trim() !== '')) {
-    return { ok: false, status: 403, error: 'Provider Settings does not answer proxied requests' };
+  if (hasProxySignals(proxyHeaders)) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'Provider Settings does not answer proxied requests',
+    };
   }
   // Every sharing signal the launcher recognizes (scripts/pinokio-preflight.mjs)
   // also disables this surface — so the gate's set is complete, not a subset the
@@ -214,22 +267,37 @@ export function admitKeySetupRequest({
   // tunnel var is. This is defense in depth regardless: the loopback+Host checks
   // below independently refuse LAN/tunnel traffic, and under Pinokio the launcher
   // refuses to boot at all when sharing is genuinely on.
-  const shareVar = String(env.PINOKIO_SHARE_VAR ?? '').trim();
-  const sharingEnabled = ['PINOKIO_SHARE_CLOUDFLARE', 'PINOKIO_SHARE_LOCAL']
-    .some((name) => /^(1|true)$/i.test(String(env[name] || '').trim()))
-    || (shareVar !== '' && shareVar !== '__gev_sharing_disabled__');
-  if (sharingEnabled) {
-    return { ok: false, status: 403, error: 'Provider Settings is disabled while sharing is enabled' };
+  if (isSharingEnabled(env)) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'Provider Settings is disabled while sharing is enabled',
+    };
   }
   if (!LOOPBACK_ADDRESSES.has(String(remoteAddress || ''))) {
-    return { ok: false, status: 403, error: 'Provider Settings answers only the machine running the server' };
+    return {
+      ok: false,
+      status: 403,
+      error: 'Provider Settings answers only the machine running the server',
+    };
   }
   const authority = localAuthority(hostHeader, protocol);
   if (!authority) {
-    return { ok: false, status: 403, error: 'Provider Settings answers only local hostnames' };
+    return {
+      ok: false,
+      status: 403,
+      error: 'Provider Settings answers only local hostnames',
+    };
   }
-  if (method === 'POST' && (origin === undefined || origin === null || origin === '')) {
-    return { ok: false, status: 403, error: 'Provider Settings requires an exact local Origin' };
+  if (
+    method === 'POST' &&
+    (origin === undefined || origin === null || origin === '')
+  ) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'Provider Settings requires an exact local Origin',
+    };
   }
   if (origin !== undefined && origin !== null && origin !== '') {
     let parsedOrigin;
@@ -238,18 +306,32 @@ export function admitKeySetupRequest({
     } catch {
       return { ok: false, status: 403, error: 'Unrecognized Origin refused' };
     }
-    const exactOrigin = parsedOrigin.username === ''
-      && parsedOrigin.password === ''
-      && parsedOrigin.pathname === '/'
-      && parsedOrigin.search === ''
-      && parsedOrigin.hash === ''
-      && parsedOrigin.origin === authority;
+    const exactOrigin =
+      parsedOrigin.username === '' &&
+      parsedOrigin.password === '' &&
+      parsedOrigin.pathname === '/' &&
+      parsedOrigin.search === '' &&
+      parsedOrigin.hash === '' &&
+      parsedOrigin.origin === authority;
     if (!exactOrigin) {
-      return { ok: false, status: 403, error: 'Cross-origin requests are refused' };
+      return {
+        ok: false,
+        status: 403,
+        error: 'Cross-origin requests are refused',
+      };
     }
   }
-  if (method === 'POST' && !String(contentType || '').toLowerCase().startsWith('application/json')) {
-    return { ok: false, status: 415, error: 'Content-Type must be application/json' };
+  if (
+    method === 'POST' &&
+    !String(contentType || '')
+      .toLowerCase()
+      .startsWith('application/json')
+  ) {
+    return {
+      ok: false,
+      status: 415,
+      error: 'Content-Type must be application/json',
+    };
   }
   return { ok: true };
 }
@@ -261,6 +343,13 @@ export function knownKeySetupEnvVars() {
     for (const envVar of entry.envVars) names.add(envVar);
   }
   return names;
+}
+
+/** Tooltip guidance for a control gated by one registry entry. */
+export function keySetupRequirement(id) {
+  const entry = KEY_SETUP_KEYS.find((candidate) => candidate.id === id);
+  if (!entry || entry.hidden) return '';
+  return `Needs ${entry.envVars.join(' + ')} — add it in Provider Settings`;
 }
 
 /**
@@ -288,7 +377,7 @@ export function isKeySetupExternallyManaged({
  * @param {Record<string, string|undefined>} env e.g. process.env
  */
 export function keySetupStatus(env = {}) {
-  const keys = KEY_SETUP_KEYS.map((entry) => {
+  const keys = KEY_SETUP_KEYS.filter((entry) => !entry.hidden).map((entry) => {
     const values = entry.envVars.map((name) => String(env[name] ?? '').trim());
     const set = values.every((value) => value.length > 0);
     return {
@@ -320,12 +409,18 @@ export function keySetupStatus(env = {}) {
  */
 export function validateKeySetupUpdates(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return { ok: false, error: 'Body must be a JSON object of {ENV_VAR: value}' };
+    return {
+      ok: false,
+      error: 'Body must be a JSON object of {ENV_VAR: value}',
+    };
   }
   const entries = Object.entries(body);
   if (entries.length === 0) return { ok: false, error: 'No keys provided' };
   if (entries.length > KEY_SETUP_UPDATE_LIMIT) {
-    return { ok: false, error: `At most ${KEY_SETUP_UPDATE_LIMIT} keys per save` };
+    return {
+      ok: false,
+      error: `At most ${KEY_SETUP_UPDATE_LIMIT} keys per save`,
+    };
   }
   const known = knownKeySetupEnvVars();
   const updates = {};
@@ -335,14 +430,21 @@ export function validateKeySetupUpdates(body) {
       updates[name] = null;
       continue;
     }
-    if (typeof raw !== 'string') return { ok: false, error: `${name} must be a string` };
+    if (typeof raw !== 'string')
+      return { ok: false, error: `${name} must be a string` };
     const value = raw.trim();
     if (!value) return { ok: false, error: `${name} is empty` };
     if (value.length > KEY_SETUP_VALUE_LIMIT) {
-      return { ok: false, error: `${name} is longer than any real key (${KEY_SETUP_VALUE_LIMIT} max)` };
+      return {
+        ok: false,
+        error: `${name} is longer than any real key (${KEY_SETUP_VALUE_LIMIT} max)`,
+      };
     }
     if (!/^[\x21-\x7e]+$/.test(value)) {
-      return { ok: false, error: `${name} may only contain printable characters with no spaces` };
+      return {
+        ok: false,
+        error: `${name} may only contain printable characters with no spaces`,
+      };
     }
     // Reject the dotenv metacharacters that would round-trip WRONG when written
     // unquoted (# starts a comment, quotes redelimit, $ expands, backslash and
@@ -350,7 +452,10 @@ export function validateKeySetupUpdates(body) {
     // parseEnv and Vite's expansion read back. Real provider keys never contain
     // these; they are base64url / hex / JWT alphabets.
     if (/[#"'$\\`]/.test(value)) {
-      return { ok: false, error: `${name} contains a character that is not valid in a key (#, quotes, $, \\, or backtick)` };
+      return {
+        ok: false,
+        error: `${name} contains a character that is not valid in a key (#, quotes, $, \\, or backtick)`,
+      };
     }
     updates[name] = value;
   }

@@ -11,6 +11,10 @@ export const GEV_KEYS = {
   NASA_FIRMS: 'FIRMS_MAP_KEY',
   TOMTOM: 'TOMTOM_API_KEY',
   CESIUM_ION: 'CESIUM_ION_TOKEN',
+  MAPILLARY: 'MAPILLARY_CLIENT_TOKEN',
+  OPENSKY_ID: 'OPENSKY_CLIENT_ID',
+  OPENSKY_SECRET: 'OPENSKY_CLIENT_SECRET',
+  LL2: 'LL2_API_TOKEN',
 };
 
 const STORAGE_PREFIX = 'GEV_KEY_';
@@ -106,6 +110,51 @@ export const KEY_SPECS = {
       'Go to "Access Tokens" tab.',
       'Copy your default token (or create one with assets:read permission).',
       'Paste it here.',
+    ],
+  },
+  [GEV_KEYS.MAPILLARY]: {
+    name: 'Mapillary Street Level Imagery',
+    category: 'Street Level & Ground Imagery',
+    required: false,
+    freeQuota: '100% Free developer access (Unlimited client token)',
+    description: 'Powers interactive street-level 360-degree photography and roadside imagery in the Street Level layer.',
+    fallback: 'Street Level layer displays preview / unavailable without token.',
+    signupUrl: 'https://www.mapillary.com/dashboard/developers',
+    guideSteps: [
+      'Visit mapillary.com/dashboard/developers and sign in or create a free account.',
+      'Click "Register Application".',
+      'Enter an application name (e.g. "GodsEyeView") and set redirect URI to "http://localhost".',
+      'Under your registered application, copy the "Client Token".',
+      'Paste the Client Token here.',
+    ],
+  },
+  [GEV_KEYS.OPENSKY_ID]: {
+    name: 'OpenSky Network Live Flights',
+    category: 'Live Telemetry',
+    required: false,
+    freeQuota: 'Keyless anonymous mode works out-of-the-box (100% Free)',
+    description: 'Live commercial and civil aviation flight tracking across global airspace.',
+    fallback: '100% Free keyless anonymous mode active by default.',
+    signupUrl: 'https://opensky-network.org/',
+    guideSteps: [
+      'OpenSky Network flights stream keyless out-of-the-box in anonymous mode with zero configuration.',
+      'To obtain higher polling credits and lower rate limits, register for a free account at opensky-network.org.',
+      'Navigate to your account dashboard to obtain OAuth client credentials.',
+      'Paste your client ID here (and client secret in server .env if using local proxy).',
+    ],
+  },
+  [GEV_KEYS.LL2]: {
+    name: 'Launch Library 2 (Space Missions)',
+    category: 'Live Telemetry',
+    required: false,
+    freeQuota: '100% Free public access works keyless out-of-the-box',
+    description: 'Live orbital rocket launches, payload trajectories, and upcoming spaceflight countdowns.',
+    fallback: '100% Free public rate-limited access active by default.',
+    signupUrl: 'https://thespacedevs.com/',
+    guideSteps: [
+      'Rocket launch telemetry streams keyless out-of-the-box using the public Launch Library 2 tier.',
+      'For higher request allowances and dedicated access, register at thespacedevs.com.',
+      'Paste your personal API token here.',
     ],
   },
 };
@@ -245,6 +294,19 @@ class KeyStore {
           }
           return { ok: false, message: 'AISStream key appears invalid (must be >= 10 characters).' };
         }
+        case GEV_KEYS.MAPILLARY: {
+          const url = `https://graph.mapillary.com/images?access_token=${encodeURIComponent(key)}&limit=1`;
+          const res = await fetch(url);
+          if (res.ok) return { ok: true, message: 'Mapillary Client Token is valid!' };
+          const errData = await res.json().catch(() => ({}));
+          return { ok: false, message: `Mapillary Error: ${errData.error?.message || `HTTP ${res.status}`}` };
+        }
+        case GEV_KEYS.LL2: {
+          if (key.length >= 8) {
+            return { ok: true, message: 'Launch Library 2 API token format verified!' };
+          }
+          return { ok: false, message: 'Token must be at least 8 characters.' };
+        }
         default:
           return { ok: true, message: 'Key saved.' };
       }
@@ -263,7 +325,7 @@ export const LICENSE_CONFIG = {
   SERVER_URL: 'https://worldpixelmap.in/apps_suite/license.php',
   APP_SLUG: 'agev',
   APP_NAME: "God's Eye View",
-  APP_VERSION: '1.0.3',
+  APP_VERSION: '1.0.4',
   STORE_URL: 'https://worldpixelmap.in/apps_suite/product.php?slug=agev',
   PORTAL_URL: 'https://worldpixelmap.in/apps_suite/portal.php',
   OFFLINE_GRACE_MS: 7 * 24 * 60 * 60 * 1000,
@@ -1250,7 +1312,7 @@ export function initKeyConfigModal() {
         </div>
         <div class="gev-config-status-item">
           <span class="status-label">KEYLESS LAYERS:</span>
-          <span class="status-val active">10 ACTIVE (100% FREE)</span>
+          <span class="status-val active">15+ ACTIVE (100% FREE)</span>
         </div>
         <div class="gev-config-status-item">
           <span class="status-label">APP VERSION:</span>
@@ -2169,7 +2231,7 @@ function injectModalStyles() {
     /* Trial Startup Toast */
     .gev-trial-toast {
       position: fixed;
-      top: 18px;
+      top: 78px;
       left: 50%;
       transform: translateX(-50%);
       background: rgba(15, 23, 42, 0.96);
@@ -2221,3 +2283,213 @@ function injectModalStyles() {
 
   document.head.appendChild(style);
 }
+
+/**
+ * Request device GPS coordinates and fly camera to the user's location.
+ */
+export async function flyToDeviceLocation(viewer, showToast = (msg) => console.log(msg)) {
+  const onLocationSuccess = (lat, lon, accuracy = 0, altitude = 0) => {
+    if (viewer?.camera) {
+      const CesiumObj = globalThis.Cesium;
+      if (CesiumObj?.Cartesian3 && CesiumObj?.Math) {
+        const targetAlt = Math.max(0, altitude || 0);
+        const targetPos = CesiumObj.Cartesian3.fromDegrees(lon, lat, targetAlt);
+        const heading = Number.isFinite(viewer.camera.heading) ? viewer.camera.heading : 0;
+        const range = Math.max(380, Math.min(1200, (accuracy || 0) * 3 + 450));
+        viewer.camera.cancelFlight?.();
+        if (typeof viewer.camera.flyToBoundingSphere === 'function' && CesiumObj.BoundingSphere && CesiumObj.HeadingPitchRange) {
+          const sphere = new CesiumObj.BoundingSphere(targetPos, 0);
+          const offset = new CesiumObj.HeadingPitchRange(
+            heading,
+            CesiumObj.Math.toRadians(-70),
+            range
+          );
+          viewer.camera.flyToBoundingSphere(sphere, {
+            offset,
+            duration: 2.0,
+            easingFunction: CesiumObj.EasingFunction?.CUBIC_IN_OUT,
+          });
+        } else {
+          viewer.camera.flyTo({
+            destination: CesiumObj.Cartesian3.fromDegrees(
+              lon,
+              lat,
+              Math.max(480, targetAlt + 480)
+            ),
+            orientation: {
+              heading,
+              pitch: CesiumObj.Math.toRadians(-89.9),
+              roll: 0,
+            },
+            duration: 2.0,
+          });
+        }
+      }
+    }
+    if (viewer?.entities) {
+      const CesiumObj = globalThis.Cesium;
+      if (CesiumObj?.Cartesian3) {
+        try {
+          const pos = CesiumObj.Cartesian3.fromDegrees(
+            lon,
+            lat,
+            Math.max(0, altitude || 0) + 2
+          );
+          let marker = viewer.entities.getById('my-location-marker');
+          if (marker) {
+            marker.position = pos;
+          } else {
+            viewer.entities.add({
+              id: 'my-location-marker',
+              name: 'My Location',
+              position: pos,
+              point: {
+                pixelSize: 16,
+                color: CesiumObj.Color.fromCssColorString('#00d4ff'),
+                outlineColor: CesiumObj.Color.WHITE,
+                outlineWidth: 3,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              },
+              ellipse: {
+                semiMajorAxis: Math.max(30, accuracy || 45),
+                semiMinorAxis: Math.max(30, accuracy || 45),
+                material: CesiumObj.Color.fromCssColorString('rgba(0, 212, 255, 0.28)'),
+                outline: true,
+                outlineColor: CesiumObj.Color.fromCssColorString('rgba(0, 212, 255, 0.9)'),
+                outlineWidth: 2,
+              },
+            });
+          }
+          viewer.scene?.requestRender?.();
+        } catch (entityErr) {
+          console.warn('[GPS] Error adding location marker entity:', entityErr);
+        }
+      }
+    }
+    const accMsg = accuracy > 0 ? ` (±${Math.round(accuracy)}m)` : '';
+    showToast(`GPS LOCKED: ${lat.toFixed(4)}°, ${lon.toFixed(4)}°${accMsg}`);
+
+    // Reverse geocode in background to display place name on the screen
+    (async () => {
+      let placeName = '';
+      let city = '';
+      let detail = '';
+      try {
+        const geoUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+        const resp = await fetch(geoUrl, {
+          headers: { 'Accept': 'application/json' },
+        }).catch(() => null);
+        if (resp?.ok) {
+          const data = await resp.json();
+          const addr = data?.address || {};
+          city = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.suburb || '';
+          detail = addr.neighbourhood || addr.road || addr.state || addr.country || '';
+          placeName = city ? (detail ? `${city}, ${detail}` : city) : (data?.display_name?.split(',').slice(0, 2).join(',') || '');
+        }
+      } catch (_e) {
+        // Fallback
+      }
+
+      const miniCityEl = document.getElementById('location-mini-city');
+      if (miniCityEl) {
+        miniCityEl.textContent = `📍 ${city || placeName || `${lat.toFixed(4)}°, ${lon.toFixed(4)}°`}`;
+      }
+      const miniPoiEl = document.getElementById('location-mini-poi');
+      if (miniPoiEl) {
+        miniPoiEl.textContent = detail || (accuracy > 0 ? `GPS ±${Math.round(accuracy)}m` : 'Current Location');
+      }
+      const searchInput = document.getElementById('location-search');
+      if (searchInput && placeName) {
+        searchInput.value = placeName;
+      }
+      const statusEl = document.getElementById('location-mini-status');
+      if (statusEl) {
+        statusEl.style.display = 'block';
+      }
+
+      if (placeName) {
+        showToast(`📍 ${placeName} [${lat.toFixed(4)}°, ${lon.toFixed(4)}°]${accMsg}`);
+      }
+    })();
+  };
+
+  const onLocationError = (err) => {
+    console.warn('[GPS] Location acquisition failed:', err);
+    if (err?.code === 1) {
+      showToast('Location permission denied — enable GPS in settings');
+    } else if (err?.code === 2) {
+      showToast('GPS position unavailable — check device GPS');
+    } else if (err?.code === 3) {
+      showToast('GPS request timed out');
+    } else {
+      showToast('Could not acquire device location');
+    }
+  };
+
+  // 1. Try native Android bridge first for instant cached position
+  try {
+    if (window.AndroidBridge?.getLastKnownLocation) {
+      const raw = window.AndroidBridge.getLastKnownLocation();
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Number.isFinite(parsed?.latitude) && Number.isFinite(parsed?.longitude)) {
+          onLocationSuccess(parsed.latitude, parsed.longitude, parsed.accuracy || 0, parsed.altitude || 0);
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[GPS] AndroidBridge location check error:', e);
+  }
+
+  // 2. Query browser/WebView Geolocation API
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    onLocationError({ code: 2, message: 'Geolocation not supported' });
+    return;
+  }
+
+  showToast('Acquiring GPS location...');
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const coords = position.coords;
+      onLocationSuccess(coords.latitude, coords.longitude, coords.accuracy, coords.altitude);
+    },
+    (error) => {
+      onLocationError(error);
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+  );
+}
+
+/**
+ * Automatically attach stored API keys from KeyStore to outgoing API requests.
+ */
+export function installKeyStoreFetchInterceptor() {
+  if (typeof window === 'undefined' || !window.fetch || window.__gev_fetch_interceptor_installed) return;
+  window.__gev_fetch_interceptor_installed = true;
+  const originalFetch = window.fetch;
+  window.fetch = async function (input, init = {}) {
+    try {
+      const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input));
+      if (url.startsWith('/api/') || url.includes('/api/')) {
+        const headers = new Headers(init.headers || (input instanceof Request ? input.headers : {}));
+        const firmsKey = keyStore.getKey(GEV_KEYS.NASA_FIRMS);
+        if (firmsKey && !headers.has('x-firms-map-key')) {
+          headers.set('x-firms-map-key', firmsKey);
+        }
+        const tomtomKey = keyStore.getKey(GEV_KEYS.TOMTOM);
+        if (tomtomKey && !headers.has('x-tomtom-key')) {
+          headers.set('x-tomtom-key', tomtomKey);
+        }
+        const aisKey = keyStore.getKey(GEV_KEYS.AISSTREAM);
+        if (aisKey && !headers.has('x-aisstream-key')) {
+          headers.set('x-aisstream-key', aisKey);
+        }
+        return originalFetch(input, { ...init, headers });
+      }
+    } catch {}
+    return originalFetch(input, init);
+  };
+}
+
+

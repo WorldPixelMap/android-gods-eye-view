@@ -1,0 +1,510 @@
+/* ── Responsive ───────────────────────────────── */
+@media (max-width: 720px) {
+  #pp-toggles {
+    --pp-expanded-width: 176px;
+    position: relative;
+    inset: auto;
+    gap: 6px;
+  }
+
+  .pp-toggle-group,
+  #clean-view-toggle {
+    width: 176px;
+  }
+
+  .button-grid {
+    flex-wrap: nowrap;
+  }
+
+  #control-panel {
+    left: 16px;
+    right: 16px;
+    transform: none;
+    max-width: none;
+  }
+
+  #title-bar {
+    top: 20px;
+    left: 20px;
+  }
+
+  #top-center-actions {
+    top: max(10px, env(safe-area-inset-top));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    gap: 6px;
+  }
+
+  #style-indicator {
+    display: none;
+  }
+
+  #title-bar h1 {
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+
+  #title-bar h1 {
+    gap: 6px;
+  }
+
+  #title-bar .title-logo {
+    width: 26px;
+  }
+
+  #title-bar .frame-rate-readout {
+    position: fixed;
+    top: 52px;
+    left: 20px;
+    margin: 0;
+    font-size: 10px;
+    line-height: 12px;
+  }
+
+  #title-bar:has(.frame-rate-readout:not([hidden])) .subtitle {
+    visibility: hidden;
+  }
+
+  #location-bar {
+    left: 16px;
+    right: 16px;
+    transform: none;
+    max-width: none;
+    bottom: 120px;
+  }
+
+  #gev-voice-control {
+    right: 16px;
+    bottom: 16px;
+    min-width: 196px;
+  }
+
+  #gev-voice-detail {
+    max-width: 112px;
+  }
+
+  .hud-top-left,
+  .hud-bottom-left {
+    left: 16px;
+  }
+
+  .hud-top-right,
+  .hud-bottom-right {
+    right: 16px;
+  }
+
+  .hud-left-edge,
+  .hud-right-edge {
+    display: none;
+  }
+
+  .hud-top-bar,
+  .hud-bottom-bar {
+    width: calc(100vw - 24px);
+    left: 12px;
+    transform: none;
+  }
+
+  .hud-top-bar {
+    top: 54px;
+    font-size: 9px;
+  }
+
+  #intel-hud[data-variant='operator'] .hud-top-bar {
+    left: 12px;
+    right: auto;
+    width: calc(100vw - 24px);
+    transform: none;
+  }
+
+  .hud-bottom-bar {
+    bottom: 90px;
+    font-size: 9px;
+  }
+
+  #data-panel {
+    top: auto;
+    left: 16px;
+    bottom: 200px;
+    width: 260px;
+  }
+
+  #data-panel.collapsed {
+    width: 260px;
+  }
+
+  #cctv-panel {
+    top: auto;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    bottom: 308px;
+  }
+
+  #cctv-panel.collapsed {
+    width: auto;
+  }
+
+  /* Narrow viewports: cap the preview height to keep the panel compact. Cap
+     the IMAGE, not the wrap — the wrap is overflow:hidden, so capping it would
+     re-crop the very timestamp this is protecting. object-fit: contain then
+     letterboxes inside the shorter box. */
+  #cctv-frame {
+    aspect-ratio: auto;
+    height: 120px;
+  }
+
+  .cctv-frame-wrap {
+    min-height: 0;
+  }
+
+  #scene-panel {
+    top: auto;
+    right: 16px;
+    left: 16px;
+    width: auto;
+    bottom: 12px;
+  }
+
+  #scene-panel.collapsed {
+    width: auto;
+  }
+
+  #left-panel-stack {
+    top: 70px;
+    right: 16px;
+    bottom: calc(50vh + 8px);
+    left: 16px;
+    width: auto;
+    max-height: none;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 212, 255, 0.5) rgba(255, 255, 255, 0.04);
+    scrollbar-gutter: stable;
+  }
+
+  #right-context-rail {
+    top: max(48px, env(safe-area-inset-top));
+    right: 16px;
+    /* The rail goes edge-to-edge at this width, so its floor is what decides
+       whether the required Google/Cesium credit line survives. The credit's
+       top edge sits at calc(2vh + 5rem) plus its own 28px, so a flat 100px
+       floor cut into it at EVERY viewport height — the DISPLAY toggles were
+       drawn straight over the notice. Track the credit's own anchor instead
+       and the 12px of clear air holds regardless of height; the rail already
+       scrolls (overflow-y below), so it loses reach, not content. */
+    bottom: calc(2vh + 7.5rem);
+    left: 16px;
+    width: auto;
+    max-height: none;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 212, 255, 0.5) rgba(255, 255, 255, 0.04);
+    scrollbar-gutter: stable;
+  }
+
+  #left-panel-stack::-webkit-scrollbar,
+  #right-context-rail::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  #left-panel-stack::-webkit-scrollbar-track,
+  #right-context-rail::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+  }
+
+  #left-panel-stack::-webkit-scrollbar-thumb,
+  #right-context-rail::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 212, 255, 0.65),
+      rgba(0, 212, 255, 0.2)
+    );
+    border-radius: 999px;
+  }
+
+  #left-panel-stack::-webkit-scrollbar-thumb:hover,
+  #right-context-rail::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 212, 255, 0.85),
+      rgba(0, 212, 255, 0.4)
+    );
+  }
+
+  /* Both stacks are scroll containers at this width (overflow-y above), which
+     also makes their overflow-x compute to auto. Each panel's decorative
+     .panel-glow is absolutely positioned with a negative inset (-18px/-20px),
+     so inside a scroll container it stops being harmless paint and becomes
+     18–20px of scrollable overflow on BOTH axes: a horizontal scrollbar band
+     under the expanded panel plus a vertical scrollbar that scrolls nothing
+     but glow. Pin the glow to the panel box here — its blur is ink overflow,
+     which never scrolls — instead of clipping the rail, which would also clip
+     legitimate content such as the Context radio popover. */
+  #left-panel-stack .panel-glow,
+  #right-context-rail .panel-glow {
+    inset: 0;
+  }
+
+  #right-context-rail > #pp-toggles {
+    width: 100%;
+  }
+
+  #right-context-rail #pp-toggles.collapsed .pp-header-row,
+  #right-context-rail #cctv-panel:not(.panel-floating),
+  #right-context-rail #cctv-panel.collapsed:not(.panel-floating),
+  #right-context-rail #street-level-panel:not(.panel-floating),
+  #right-context-rail #street-level-panel.collapsed:not(.panel-floating),
+  #right-context-rail #recent-imagery-panel,
+  #right-context-rail #recent-imagery-panel.collapsed,
+  #right-context-rail #radio-panel,
+  #right-context-rail #radio-panel.collapsed,
+  #right-context-rail #global-context-panel,
+  #right-context-rail #global-context-panel.collapsed {
+    width: 100%;
+  }
+
+  #right-context-rail:has(> [data-panel-id]:not(.collapsed)) > [data-panel-id].collapsed:not(.panel-floating) {
+    display: none !important;
+  }
+
+  .context-radio-mini {
+    right: -38px;
+    width: min(244px, calc(100vw - 32px));
+  }
+
+  #left-panel-stack > #data-panel,
+  #left-panel-stack > #cctv-panel,
+  #left-panel-stack > #street-level-panel,
+  #left-panel-stack > #global-context-panel,
+  #left-panel-stack > #scene-panel,
+  #left-panel-stack > #data-panel.collapsed,
+  #left-panel-stack > #cctv-panel.collapsed,
+  #left-panel-stack > #street-level-panel.collapsed,
+  #left-panel-stack > #global-context-panel.collapsed,
+  #left-panel-stack > #scene-panel.collapsed {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+  }
+
+  #scene-runtime {
+    top: 16px;
+    max-width: calc(100vw - 24px);
+    text-align: center;
+  }
+}
+
+@media (max-width: 520px) {
+  /* 16px keeps the Radio broadcast waves (15px above the logo) on-screen. */
+  #title-bar {
+    top: 16px;
+    left: 16px;
+  }
+
+  #title-bar h1 > span:last-child,
+  #title-bar .subtitle {
+    display: none;
+  }
+}
+
+/* ── Compact & Mobile Landscape (e.g. phones in landscape orientation) ── */
+@media (max-height: 600px) {
+  #title-bar {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+  }
+
+  #title-bar h1 {
+    font-size: 13px;
+    letter-spacing: 2px;
+    gap: 6px;
+  }
+
+  #title-bar .title-logo {
+    width: 24px;
+  }
+
+  #title-bar .subtitle {
+    font-size: 7px;
+    letter-spacing: 2px;
+    margin-top: 1px;
+  }
+
+  #top-center-actions {
+    top: max(8px, env(safe-area-inset-top));
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    gap: 5px;
+  }
+
+  #top-center-actions button {
+    width: 30px;
+    height: 30px;
+  }
+
+  #top-center-actions .material-symbols-outlined {
+    font-size: 17px;
+  }
+
+  #style-indicator {
+    display: none;
+  }
+
+  #left-panel-stack {
+    top: 48px;
+    left: max(10px, env(safe-area-inset-left));
+    right: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: auto;
+    max-width: min(390px, 48vw);
+    max-height: calc(100vh - 58px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    pointer-events: none;
+  }
+
+  #left-panel-stack > * {
+    pointer-events: auto;
+  }
+
+  #left-panel-stack > [data-panel-id]:not(.collapsed) {
+    width: min(380px, calc(100vw - 28px));
+    max-width: min(380px, calc(100vw - 28px));
+    max-height: calc(100vh - 58px);
+    min-height: min(200px, 60vh);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(0, 212, 255, 0.5) rgba(255, 255, 255, 0.04) !important;
+    scrollbar-gutter: stable;
+  }
+
+  #right-context-rail > [data-panel-id]:not(.collapsed):not(#pp-toggles) {
+    width: min(350px, calc(100vw - 28px));
+    max-width: min(350px, calc(100vw - 28px));
+    max-height: calc(100vh - 58px);
+    min-height: min(200px, 60vh);
+    overflow: hidden;
+  }
+
+  #right-context-rail > #pp-toggles:not(.collapsed),
+  #right-context-rail #pp-toggles:not(.collapsed) {
+    width: min(350px, calc(100vw - 28px));
+    max-width: min(350px, calc(100vw - 28px));
+    max-height: calc(100vh - 58px);
+    min-height: min(200px, 60vh);
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(0, 212, 255, 0.5) rgba(255, 255, 255, 0.04) !important;
+    scrollbar-gutter: stable;
+  }
+
+  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner,
+  #cctv-panel:not(.collapsed) .cctv-panel-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    max-height: calc(100vh - 58px);
+    min-height: min(200px, 60vh);
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(0, 212, 255, 0.5) rgba(255, 255, 255, 0.04) !important;
+    scrollbar-gutter: stable;
+  }
+
+  #right-context-rail::-webkit-scrollbar:horizontal,
+  #right-context-rail *::-webkit-scrollbar:horizontal,
+  #cctv-panel::-webkit-scrollbar:horizontal,
+  #cctv-panel *::-webkit-scrollbar:horizontal,
+  #pp-toggles::-webkit-scrollbar:horizontal,
+  #pp-toggles *::-webkit-scrollbar:horizontal {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar,
+  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar,
+  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar,
+  #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar,
+  #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar,
+  #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar {
+    width: 6px !important;
+  }
+
+  #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-track,
+  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-track,
+  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track,
+  #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar-track,
+  #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar-track,
+  #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-radius: 999px !important;
+  }
+
+  #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb,
+  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb,
+  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb,
+  #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb,
+  #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb,
+  #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 212, 255, 0.65),
+      rgba(0, 212, 255, 0.2)
+    ) !important;
+    border-radius: 999px !important;
+  }
+
+  #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover,
+  #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(0, 212, 255, 0.85),
+      rgba(0, 212, 255, 0.4)
+    ) !important;
+  }
+}
+
+/* ── Tablets & Intermediate Viewports ── */
+@media (min-width: 721px) and (max-width: 1024px) {
+  #title-bar h1 {
+    font-size: clamp(13px, 1.8vw, 16px);
+    letter-spacing: 2.5px;
+    gap: 8px;
+  }
+
+  #title-bar .title-logo {
+    width: 28px;
+  }
+
+  #title-bar .subtitle {
+    font-size: 7.5px;
+    letter-spacing: 2.5px;
+  }
+
+  #top-center-actions {
+    top: max(10px, env(safe-area-inset-top));
+    gap: 6px;
+  }
+
+  #top-center-actions button {
+    width: 32px;
+    height: 32px;
+  }
+}

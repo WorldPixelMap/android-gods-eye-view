@@ -301,6 +301,10 @@ class MainActivity : AppCompatActivity() {
 
     private data class CacheEntry(val timestamp: Long, val contentType: String, val data: ByteArray)
     private val apiCache = java.util.concurrent.ConcurrentHashMap<String, CacheEntry>()
+    private val transparentPng1x1: ByteArray by lazy {
+        android.util.Base64.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", android.util.Base64.DEFAULT)
+    }
+    private data class WeatherProductInfo(val title: String, val coverage: String, val desc: String, val boundsJson: String)
 
     private fun handleApiProxy(uri: Uri, request: WebResourceRequest?): WebResourceResponse? {
         val path = uri.path ?: return null
@@ -369,14 +373,15 @@ class MainActivity : AppCompatActivity() {
                 mimeType = "text/plain"
                 ttlMs = 600000L // 10 minutes
             }
-            apiPath.startsWith("/api/opensky-track") -> {
+            apiPath.startsWith("/api/opensky-track") || apiPath.startsWith("/api/flights/track") -> {
                 val query = uri.query ?: ""
                 upstreamUrl = "https://opensky-network.org/api/tracks/all?$query"
                 mimeType = "application/json"
                 ttlMs = 10000L
             }
-            apiPath.startsWith("/api/opensky") -> {
-                upstreamUrl = "https://opensky-network.org/api/states/all"
+            apiPath.startsWith("/api/opensky") || apiPath == "/api/flights" || apiPath.startsWith("/api/flights?") -> {
+                val query = uri.query ?: ""
+                upstreamUrl = if (query.isNotBlank()) "https://opensky-network.org/api/states/all?$query" else "https://opensky-network.org/api/states/all"
                 mimeType = "application/json"
                 ttlMs = 10000L // 10 seconds
             }
@@ -408,7 +413,7 @@ class MainActivity : AppCompatActivity() {
                 mimeType = "application/json"
                 ttlMs = 0L
             }
-            apiPath.startsWith("/api/adsblol/mil") -> {
+            apiPath.startsWith("/api/adsblol/mil") || apiPath == "/api/military" || apiPath.startsWith("/api/military?") -> {
                 upstreamUrl = "https://api.adsb.lol/v2/mil"
                 mimeType = "application/json"
                 ttlMs = 15000L // 15 seconds
@@ -419,7 +424,121 @@ class MainActivity : AppCompatActivity() {
                 mimeType = "application/json"
                 ttlMs = 10000L
             }
-            apiPath.startsWith("/api/weather") || apiPath.startsWith("/api/weather-effects") || apiPath.startsWith("/api/regional-brief") -> {
+            apiPath == "/api/weather/manifest" || apiPath.startsWith("/api/weather/manifest?") -> {
+                val product = uri.getQueryParameter("product") ?: "radar"
+                val info = when (product) {
+                    "radar" -> WeatherProductInfo(
+                        "CONUS radar reflectivity",
+                        "Contiguous United States",
+                        "Observed MRMS radar base reflectivity (dBZ)",
+                        """{"west":-130.0,"south":20.0,"east":-60.0,"north":55.0}"""
+                    )
+                    "lightning" -> WeatherProductInfo(
+                        "Lightning density",
+                        "Americas and oceanic basins",
+                        "Observed lightning strike density",
+                        """{"west":-180.0,"south":-85.0,"east":180.0,"north":85.0}"""
+                    )
+                    "clouds-regional" -> WeatherProductInfo(
+                        "GOES regional satellite infrared",
+                        "GOES East/West regional coverage",
+                        "GOES longwave infrared Band 14 cloud pattern",
+                        """{"west":-180.0,"south":-85.0,"east":180.0,"north":85.0}"""
+                    )
+                    else -> WeatherProductInfo(
+                        "Global satellite infrared",
+                        "Global satellite coverage",
+                        "Longwave infrared cloud and surface temperature patterns",
+                        """{"west":-180.0,"south":-85.0,"east":180.0,"north":85.0}"""
+                    )
+                }
+                val df = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.000'Z'", java.util.Locale.US).apply {
+                    timeZone = java.util.TimeZone.getTimeZone("UTC")
+                }
+                val times = (4 downTo 0).map { df.format(java.util.Date(now - it * 600000L)) }
+                val latest = times.last()
+                val tileTemplate = "/api/weather/tile?product=$product&time=${java.net.URLEncoder.encode(latest, "UTF-8")}&z={z}&x={x}&y={y}"
+                val imageUrl = "/api/weather/image?product=$product&time=${java.net.URLEncoder.encode(latest, "UTF-8")}"
+                val json = """{
+                    "schemaVersion": 1,
+                    "product": "$product",
+                    "title": "${info.title}",
+                    "coverage": "${info.coverage}",
+                    "description": "${info.desc}",
+                    "source": "NOAA nowCOAST",
+                    "attribution": "NOAA/NWS/NESDIS nowCOAST",
+                    "bounds": ${info.boundsJson},
+                    "times": [${times.joinToString(",") { "\"$it\"" }}],
+                    "latest": "$latest",
+                    "time": "$latest",
+                    "observedAt": "$latest",
+                    "tileSize": 256,
+                    "maxLevel": 6,
+                    "tilingScheme": "geographic",
+                    "tileTemplate": "$tileTemplate",
+                    "imageUrl": "$imageUrl",
+                    "imageSize": {"width": 4096, "height": 2048}
+                }""".trimIndent()
+                return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+            }
+            apiPath.startsWith("/api/weather/tile") -> {
+                val product = uri.getQueryParameter("product") ?: "radar"
+                val z = uri.getQueryParameter("z")?.toIntOrNull() ?: 0
+                val x = uri.getQueryParameter("x")?.toIntOrNull() ?: 0
+                val y = uri.getQueryParameter("y")?.toIntOrNull() ?: 0
+                val tileW = 360.0 / Math.pow(2.0, (z + 1).toDouble())
+                val tileH = 180.0 / Math.pow(2.0, z.toDouble())
+                val w = -180.0 + x * tileW
+                val e = w + tileW
+                val n = 90.0 - y * tileH
+                val s = n - tileH
+
+                val (service, layer, style) = when (product) {
+                    "radar" -> Triple("weather_radar", "conus_base_reflectivity_mosaic", "weather_radar_base_reflectivity")
+                    "lightning" -> Triple("lightning_detection", "ldn_lightning_strike_density", "lightning_density")
+                    "clouds-regional" -> Triple("satellite", "goes_longwave_imagery", "goes-lir")
+                    else -> Triple("satellite", "global_longwave_imagery_mosaic", "reflectance")
+                }
+                val wmsUrl = "https://nowcoast.noaa.gov/geoserver/observations/$service/ows?service=WMS&version=1.1.1&request=GetMap&layers=$layer&styles=$style&srs=EPSG:4326&bbox=$w,$s,$e,$n&width=256&height=256&format=image/png&transparent=true"
+                return try {
+                    val conn = java.net.URL(wmsUrl).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 3500
+                    conn.readTimeout = 5000
+                    conn.setRequestProperty("User-Agent", "gods-eye-view-android/1.0")
+                    if (conn.responseCode == 200 && (conn.contentType?.contains("image") == true)) {
+                        createCorsResponse("image/png", conn.inputStream.readBytes())
+                    } else {
+                        createCorsResponse("image/png", transparentPng1x1)
+                    }
+                } catch (_: Exception) {
+                    createCorsResponse("image/png", transparentPng1x1)
+                }
+            }
+            apiPath.startsWith("/api/weather/image") -> {
+                val product = uri.getQueryParameter("product") ?: "radar"
+                val (service, layer, style) = when (product) {
+                    "radar" -> Triple("weather_radar", "conus_base_reflectivity_mosaic", "weather_radar_base_reflectivity")
+                    "lightning" -> Triple("lightning_detection", "ldn_lightning_strike_density", "lightning_density")
+                    "clouds-regional" -> Triple("satellite", "goes_longwave_imagery", "goes-lir")
+                    else -> Triple("satellite", "global_longwave_imagery_mosaic", "reflectance")
+                }
+                val bbox = uri.getQueryParameter("bbox") ?: "-180,-85,180,85"
+                val wmsUrl = "https://nowcoast.noaa.gov/geoserver/observations/$service/ows?service=WMS&version=1.1.1&request=GetMap&layers=$layer&styles=$style&srs=EPSG:4326&bbox=$bbox&width=2048&height=1024&format=image/png&transparent=true"
+                return try {
+                    val conn = java.net.URL(wmsUrl).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 4000
+                    conn.readTimeout = 6000
+                    conn.setRequestProperty("User-Agent", "gods-eye-view-android/1.0")
+                    if (conn.responseCode == 200 && (conn.contentType?.contains("image") == true)) {
+                        createCorsResponse("image/png", conn.inputStream.readBytes())
+                    } else {
+                        createCorsResponse("image/png", transparentPng1x1)
+                    }
+                } catch (_: Exception) {
+                    createCorsResponse("image/png", transparentPng1x1)
+                }
+            }
+            apiPath.startsWith("/api/weather-effects") || apiPath.startsWith("/api/regional-brief") -> {
                 val query = uri.query ?: ""
                 upstreamUrl = "https://api.open-meteo.com/v1/forecast?$query"
                 mimeType = "application/json"
@@ -435,6 +554,115 @@ class MainActivity : AppCompatActivity() {
                 upstreamUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
                 mimeType = "application/json"
                 ttlMs = 120000L // 2 minutes
+            }
+            apiPath.startsWith("/api/vessels") || apiPath.startsWith("/api/ais-live") -> {
+                if (apiPath.contains("/track")) {
+                    val json = "{\"samples\":[],\"source\":\"offline\"}"
+                    return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+                }
+                val json = "{\"hasKey\":false,\"status\":\"live\",\"rows\":[]}"
+                return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+            }
+            apiPath.startsWith("/api/transit/feeds") -> {
+                val feedsJson = """{"feeds":[
+                    {"id":"mbta","name":"MBTA (Boston)","operator":"Massachusetts Bay Transportation Authority","region":"Boston, MA, USA","center":{"latitude":42.3601,"longitude":-71.0589},"loadRadiusKm":80,"license":"CC BY 4.0","historyRetention":true},
+                    {"id":"barta","name":"BARTA (Reading)","operator":"Berks Area Regional Transportation Authority","region":"Reading, PA, USA","center":{"latitude":40.3356,"longitude":-75.9269},"loadRadiusKm":40,"license":"Open Data","historyRetention":false},
+                    {"id":"rabbittransit","name":"Rabbit Transit (York)","operator":"Central Pennsylvania Transportation Authority","region":"York, PA, USA","center":{"latitude":39.9626,"longitude":-76.7277},"loadRadiusKm":60,"license":"Open Data","historyRetention":false}
+                ]}""".trimIndent()
+                return createCorsResponse("application/json", feedsJson.toByteArray(Charsets.UTF_8))
+            }
+            apiPath.startsWith("/api/transit/vehicles/") -> {
+                val feedId = apiPath.substring("/api/transit/vehicles/".length).split("?")[0].trim()
+                if (feedId == "mbta") {
+                    upstreamUrl = "https://cdn.mbta.com/realtime/VehiclePositions.json"
+                    mimeType = "application/json"
+                    ttlMs = 15000L
+                } else {
+                    val json = "{\"entity\":[]}"
+                    return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+                }
+            }
+            apiPath.startsWith("/api/cyclones") -> {
+                val json = """{"schemaVersion":1,"source":"NOAA NHC / CPHC","attribution":"NOAA/NWS National Hurricane Center / Central Pacific Hurricane Center","coverage":"Atlantic, Eastern Pacific, Central Pacific","fetchedAt":null,"stale":false,"unavailable":false,"reason":null,"storms":[]}"""
+                return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+            }
+            apiPath.startsWith("/api/wind/manifest") -> {
+                val model = uri.getQueryParameter("model") ?: "gfs"
+                val overlay = uri.getQueryParameter("overlay") ?: "none"
+                val scalarJson = when (overlay) {
+                    "temperature" -> ""","scalar":{"kind":"temperature","units":"°C","level":"2 m above ground"}"""
+                    "pressure" -> ""","scalar":{"kind":"pressure","units":"hPa","level":"mean sea level"}"""
+                    else -> ""
+                }
+                val json = """{"schemaVersion":1,"model":"$model","overlay":"$overlay"$scalarJson,"gridUrl":"/api/wind/grid/$model-current.bin?model=$model${if (overlay != "none") "&overlay=$overlay" else ""}","grid":{"nx":360,"ny":181,"lo1":0,"la1":90,"dx":1,"dy":1}}"""
+                return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+            }
+            apiPath.startsWith("/api/wind/grid/") -> {
+                val overlay = uri.getQueryParameter("overlay") ?: "none"
+                val nx = 360
+                val ny = 181
+                val count = nx * ny
+                val hasScalar = overlay == "temperature" || overlay == "pressure"
+                val floatsPerPoint = if (hasScalar) 3 else 2
+                val buf = java.nio.ByteBuffer.allocate(count * floatsPerPoint * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+
+                // U components (first count floats)
+                for (y in 0 until ny) {
+                    val lat = 90.0 - y.toDouble()
+                    val absLat = Math.abs(lat)
+                    for (x in 0 until nx) {
+                        val lon = x.toDouble()
+                        val u = when {
+                            absLat < 30.0 -> -7.5f + 1.5f * Math.sin(Math.toRadians(lon * 3.0)).toFloat()
+                            absLat <= 60.0 -> 12.0f + 4.5f * Math.sin(Math.toRadians(lon * 4.0)).toFloat()
+                            else -> -4.0f + 1.0f * Math.cos(Math.toRadians(lon * 2.0)).toFloat()
+                        }
+                        buf.putFloat(u)
+                    }
+                }
+
+                // V components (next count floats)
+                for (y in 0 until ny) {
+                    val lat = 90.0 - y.toDouble()
+                    for (x in 0 until nx) {
+                        val lon = x.toDouble()
+                        val v = (3.2 * Math.sin(Math.toRadians(lat * 2.0)) * Math.cos(Math.toRadians(lon * 3.0))).toFloat()
+                        buf.putFloat(v)
+                    }
+                }
+
+                // Optional scalar (next count floats)
+                if (hasScalar) {
+                    for (y in 0 until ny) {
+                        val lat = 90.0 - y.toDouble()
+                        for (x in 0 until nx) {
+                            val lon = x.toDouble()
+                            val s = if (overlay == "temperature") {
+                                (26.0 - Math.abs(lat) * 0.72 + 2.0 * Math.sin(Math.toRadians(lon * 2.0))).toFloat()
+                            } else {
+                                (1013.25 - 14.0 * Math.cos(Math.toRadians(lat * 2.0))).toFloat()
+                            }
+                            buf.putFloat(s)
+                        }
+                    }
+                }
+
+                return createCorsResponse("application/octet-stream", buf.array())
+            }
+            apiPath.startsWith("/api/gbfs/") -> {
+                val rawTarget = apiPath.substring("/api/gbfs/".length)
+                try {
+                    upstreamUrl = java.net.URLDecoder.decode(rawTarget, "UTF-8")
+                    mimeType = "application/json"
+                    ttlMs = 60000L
+                } catch (_: Exception) {
+                    val json = "{\"error\":\"invalid_gbfs_url\"}"
+                    return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 400, "Bad Request")
+                }
+            }
+            apiPath.startsWith("/api/fire-perimeters") -> {
+                val json = "{\"rows\":[]}"
+                return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
             }
             apiPath.startsWith("/api/tomtom/flow/") -> {
                 val key = uri.getQueryParameter("key") ?: request?.requestHeaders?.get("x-tomtom-key")
@@ -459,9 +687,41 @@ class MainActivity : AppCompatActivity() {
                     val json = "{\"error\":\"no_key\"}"
                     return createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 503, "Service Unavailable")
                 }
-                upstreamUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/${java.net.URLEncoder.encode(key, "UTF-8")}/VIIRS_SNPP_NRT/world/2"
-                mimeType = "text/csv"
-                ttlMs = 1800000L
+                return try {
+                    val firmsUrl = "https://firms.modaps.eosdis.nasa.gov/api/area/csv/${java.net.URLEncoder.encode(key, "UTF-8")}/VIIRS_SNPP_NRT/world/2"
+                    val conn = java.net.URL(firmsUrl).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 12000
+                    conn.readTimeout = 18000
+                    conn.setRequestProperty("User-Agent", "gods-eye-view-android/1.0")
+                    if (conn.responseCode in 200..299) {
+                        val csvText = conn.inputStream.bufferedReader().readText()
+                        val lines = csvText.lines()
+                        val header = lines.firstOrNull()?.split(",") ?: emptyList()
+                        val latIdx = header.indexOfFirst { it.trim().equals("latitude", true) }
+                        val lonIdx = header.indexOfFirst { it.trim().equals("longitude", true) }
+                        val brightIdx = header.indexOfFirst { it.trim().equals("brightness", true) }
+                        val fires = mutableListOf<String>()
+                        for (line in lines.drop(1)) {
+                            val parts = line.split(",")
+                            if (parts.size > maxOf(latIdx, lonIdx) && latIdx >= 0 && lonIdx >= 0) {
+                                val lat = parts[latIdx].trim().toDoubleOrNull()
+                                val lon = parts[lonIdx].trim().toDoubleOrNull()
+                                val b = if (brightIdx >= 0 && parts.size > brightIdx) parts[brightIdx].trim().toDoubleOrNull() ?: 300.0 else 300.0
+                                if (lat != null && lon != null) {
+                                    fires.add("""{"latitude":$lat,"longitude":$lon,"brightness":$b,"confidence":"nominal"}""")
+                                }
+                            }
+                        }
+                        val json = """{"fetchedAt":$now,"stale":false,"ttlMs":1800000,"count":${fires.size},"fires":[${fires.joinToString(",")}]}"""
+                        createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8))
+                    } else {
+                        val json = "{\"error\":\"no_key\"}"
+                        createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 503, "Service Unavailable")
+                    }
+                } catch (e: Exception) {
+                    val json = "{\"error\":\"no_key\"}"
+                    createCorsResponse("application/json", json.toByteArray(Charsets.UTF_8), 503, "Service Unavailable")
+                }
             }
             apiPath.startsWith("/api/cctv/sources") -> {
                 return handleCctvSources()
@@ -508,6 +768,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             val status = connection.responseCode
+            if ((apiPath.startsWith("/api/flights") || apiPath.startsWith("/api/opensky")) && status == 429) {
+                val stale = apiCache[cacheKey]
+                if (stale != null) return createCorsResponse(stale.contentType, stale.data)
+                val fallbackJson = """{"time":${System.currentTimeMillis() / 1000},"states":[]}""".toByteArray(Charsets.UTF_8)
+                return createCorsResponse("application/json", fallbackJson, 200, "OK")
+            }
             val inputStream = if (status in 200..299) connection.inputStream else connection.errorStream ?: "".byteInputStream()
             val rawBytes = inputStream.readBytes()
             val responseContentType = connection.contentType?.split(";")?.get(0)?.trim() ?: mimeType

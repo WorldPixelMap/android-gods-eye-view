@@ -34,7 +34,7 @@ test('TitanLicense: compareVersions compares semantic versions correctly', () =>
 test('TitanLicense: configuration matches required Titan License server endpoints', () => {
   assert.equal(LICENSE_CONFIG.SERVER_URL, 'https://worldpixelmap.in/apps_suite/license.php');
   assert.equal(LICENSE_CONFIG.APP_SLUG, 'agev');
-  assert.equal(LICENSE_CONFIG.APP_VERSION, '1.0.3');
+  assert.equal(LICENSE_CONFIG.APP_VERSION, '1.0.4');
   assert.equal(LICENSE_CONFIG.STORE_URL, 'https://worldpixelmap.in/apps_suite/product.php?slug=agev');
   assert.equal(LICENSE_CONFIG.PORTAL_URL, 'https://worldpixelmap.in/apps_suite/portal.php');
 });
@@ -313,13 +313,13 @@ test('TitanLicense: checkUpdate detects up-to-date and newer versions', async ()
   const originalFetch = globalThis.fetch;
 
   try {
-    // Newer version available (1.0.4 > current 1.0.3)
+    // Newer version available (1.0.5 > current 1.0.4)
     globalThis.fetch = async () => ({
       ok: true,
       json: async () => ({
         success: true,
         app_name: "Android God's Eye View",
-        latest_version: '1.0.4',
+        latest_version: '1.0.5',
         download_url: 'https://worldpixelmap.in/apps_suite/download.php?app=agev',
         file_size: '22 MB',
         features: 'Performance fixes',
@@ -328,13 +328,13 @@ test('TitanLicense: checkUpdate detects up-to-date and newer versions', async ()
     const updateNew = await TitanLicense.checkUpdate();
     assert.equal(updateNew.isUpdateAvailable, true);
 
-    // Same version installed (up to date — 1.0.3 === 1.0.3)
+    // Same version installed (up to date — 1.0.4 === 1.0.4)
     globalThis.fetch = async () => ({
       ok: true,
       json: async () => ({
         success: true,
         app_name: "Android God's Eye View",
-        latest_version: '1.0.3',
+        latest_version: '1.0.4',
         download_url: 'https://worldpixelmap.in/apps_suite/download.php?app=agev',
         file_size: '22 MB',
         features: 'Current release',

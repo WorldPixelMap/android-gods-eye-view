@@ -8,7 +8,7 @@ object LicenseConfig {
     const val SERVER_URL = "https://worldpixelmap.in/apps_suite/license.php"
     const val APP_SLUG = "agev"
     const val APP_NAME = "God's Eye View"
-    const val APP_VERSION = "1.0.3"
+    const val APP_VERSION = "1.0.4"
     const val STORE_URL = "https://worldpixelmap.in/apps_suite/product.php?slug=agev"
     const val PORTAL_URL = "https://worldpixelmap.in/apps_suite/portal.php"
 

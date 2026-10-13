@@ -32,7 +32,8 @@ export function resolvePickId(picked) {
     if (id === null || id === undefined) return undefined;
     if (typeof id === 'object') {
       // AIS vessel record (id object with .mmsi) or Cesium Entity (.id string)
-      if (typeof id.mmsi === 'string' || typeof id.mmsi === 'number') return id.mmsi;
+      if (typeof id.mmsi === 'string' || typeof id.mmsi === 'number')
+        return id.mmsi;
       if (typeof id.id === 'string' || typeof id.id === 'number') return id.id;
       return undefined;
     }
@@ -40,7 +41,7 @@ export function resolvePickId(picked) {
   };
   let id = unwrap(picked.id);
   if (id === undefined) id = unwrap(picked.primitive?.id);
-  return (typeof id === 'string' || typeof id === 'number') ? String(id) : null;
+  return typeof id === 'string' || typeof id === 'number' ? String(id) : null;
 }
 
 /**
@@ -62,6 +63,23 @@ export function registerPickOwner(layerId, predicate) {
  */
 export function unregisterPickOwner(layerId) {
   _owners.delete(layerId);
+}
+
+/**
+ * The registered layer that owns a picked id, or null.
+ * @param {string} pickedId - Canonical pick id from {@link resolvePickId}.
+ * @returns {string|null} Owning layer id.
+ */
+export function findPickOwner(pickedId) {
+  if (!pickedId) return null;
+  for (const [ownerId, predicate] of _owners) {
+    try {
+      if (predicate(pickedId)) return ownerId;
+    } catch {
+      // a broken predicate must never break picking
+    }
+  }
+  return null;
 }
 
 /**

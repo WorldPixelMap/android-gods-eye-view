@@ -6,17 +6,18 @@
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="author" content="WorldPixelMap" />
   <title>God's Eye View</title>
   <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
-  <script type="module" crossorigin src="/assets/index-_luPPddn.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-a0BZcgwp.css">
+  <!-- Icon font subset to the glyphs this app renders. Keep `icon_names` in sync
+       with the sources: src/materialSymbolsSubset.test.mjs fails when a source
+       names a glyph this list is missing, because a missing glyph does not draw
+       a box — the ligature never forms and the element renders the literal word. -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0&icon_names=adjust,arrow_drop_down,arrow_forward,arrow_left,arrow_right,bolt,chevron_left,chevron_right,close,close_fullscreen,dark_mode,draw,east,flare,flight,fullscreen,fullscreen_exit,layers_clear,light_mode,local_fire_department,my_location,navigation,normal,on,open_in_full,public,radar,radio,right_panel_close,right_panel_open,rocket_launch,settings,skip_next,skip_previous,view_in_ar" rel="stylesheet" />
+  <script type="module" crossorigin src="/assets/index-Cvy6eAO4.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CR-HQaUP.css">
 </head>
 <body>
   <div id="cesiumContainer"></div>
@@ -46,17 +47,27 @@
     <button id="gev-config-btn" type="button" aria-label="System configuration and API keys" title="Configure API Keys & Settings">
       <span class="material-symbols-outlined" aria-hidden="true">settings</span>
     </button>
+    <button id="my-location-btn" type="button" aria-label="Go to my GPS location" title="Go to device GPS location">
+      <span class="material-symbols-outlined" aria-hidden="true">my_location</span>
+    </button>
     <button id="clear-selected-layers" type="button" aria-label="Clear selected data layers" title="Turn off all selected data layers">
       <span class="material-symbols-outlined" aria-hidden="true">layers_clear</span>
     </button>
     <button id="share-btn" type="button" aria-label="Copy share link" title="Copy share link">
       <span class="share-icon" aria-hidden="true">&#x1F517;</span>
     </button>
-    <button id="my-location-btn" type="button" aria-label="Go to my GPS location" title="Go to device GPS location">
-      <span class="material-symbols-outlined" aria-hidden="true">my_location</span>
+    <button id="tilt-map-view" type="button" aria-label="Tilt map to oblique view" aria-pressed="false" title="Toggle straight-down and tilted map views">
+      <span class="material-symbols-outlined" aria-hidden="true">view_in_ar</span>
+    </button>
+    <button id="north-up-view" type="button" aria-label="Reset map to north up" title="Reset map bearing to north">
+      <span class="camera-compass-n" aria-hidden="true">N</span>
+      <span class="camera-compass-needle material-symbols-outlined" aria-hidden="true">navigation</span>
     </button>
     <button id="reset-globe-view" type="button" aria-label="Reset to full globe view" title="Reset camera and return to full globe view">
       <span class="material-symbols-outlined" aria-hidden="true">public</span>
+    </button>
+    <button id="fullscreen-view-btn" type="button" aria-label="Toggle full screen view" title="Toggle full screen view in browser">
+      <span class="material-symbols-outlined" aria-hidden="true">fullscreen</span>
     </button>
   </nav>
   <div id="global-loading-status" role="status" aria-live="polite" aria-atomic="true" hidden>
@@ -82,6 +93,50 @@
 
   <!-- Aircraft first-person view. It can be entered from the visible view switcher. -->
   <section id="cockpit-hud" aria-label="Aircraft cockpit view" hidden>
+    <!-- One optical coordinate system: every targeting mark shares this center.
+         Decorative only; telemetry and interactive panels remain separate. -->
+    <svg class="cockpit-frame-lines" viewBox="0 0 1200 720" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor">
+        <path d="M42 106H234L266 126H334 M866 126H934L966 106H1158 M42 114H226L258 136H318 M882 136H942L974 114H1158"/>
+        <path d="M42 616H226L254 598H320 M880 598H946L974 616H1158 M42 624H238L266 606H330 M870 606H934L962 624H1158"/>
+        <path d="M322 650H878L858 622H728L708 634H492L472 622H342Z M348 659H852"/>
+        <path d="M72 160H144L158 174V186 M1056 160H1128L1142 174V186 M72 562H144L158 548V536 M1056 562H1128L1142 548V536"/>
+      </g>
+      <path class="cockpit-frame-warning" d="M338 645H476L490 654H710L724 645H862" fill="none"/>
+      <path class="cockpit-frame-meter" d="M372 642H418 M782 642H828"/>
+    </svg>
+    <div class="cockpit-scan-array" aria-hidden="true">
+      <svg class="cockpit-target-geometry" viewBox="0 0 600 600" fill="none" focusable="false">
+        <g class="cockpit-target-hairline">
+          <circle cx="300" cy="300" r="276"/>
+          <circle class="cockpit-target-drift" cx="300" cy="300" r="250" stroke-dasharray="1 13"/>
+          <circle cx="300" cy="300" r="164"/>
+          <path d="M190 237V363 M410 237V363 M99 227H139 M461 227H501 M99 373H139 M461 373H501"/>
+          <path d="M86 113H118L134 129 M514 113H482L466 129 M86 487H118L134 471 M514 487H482L466 471"/>
+        </g>
+        <g class="cockpit-target-side-arcs">
+          <path d="M70 167A266 266 0 0 0 70 433 M530 167A266 266 0 0 1 530 433"/>
+        </g>
+        <g class="cockpit-target-ticks">
+          <path d="M166 125A220 220 0 0 1 434 125 M166 475A220 220 0 0 0 434 475"/>
+        </g>
+        <g class="cockpit-target-dots">
+          <path d="M180 130A208 208 0 0 1 420 130 M180 470A208 208 0 0 0 420 470"/>
+        </g>
+        <g class="cockpit-target-warning-dots">
+          <path d="M172 112A227 227 0 0 1 428 112 M172 488A227 227 0 0 0 428 488"/>
+        </g>
+        <g class="cockpit-target-core">
+          <!-- One outer ring and a spaced rotor leave the aiming center open. -->
+          <circle class="cockpit-target-orbit" cx="300" cy="300" r="132" stroke-dasharray="186 21"/>
+          <circle class="cockpit-target-rotor" cx="300" cy="300" r="104" stroke-dasharray="128 35" transform="rotate(9 300 300)"/>
+          <path class="cockpit-target-spokes" d="M206 206L250 250 M350 350L394 394 M394 206L350 250 M250 350L206 394"/>
+          <path d="M168 291H180V309H168 M432 291H420V309H432"/>
+          <circle cx="206" cy="206" r="3"/><circle cx="394" cy="206" r="3"/>
+          <circle cx="206" cy="394" r="3"/><circle cx="394" cy="394" r="3"/>
+        </g>
+      </svg>
+    </div>
     <div class="cockpit-visor-shell" aria-hidden="true">
       <div class="cockpit-roll-arc">
         <span style="--slot:-3;--depth:3">−30</span>
@@ -372,6 +427,7 @@
       <span class="panel-divider" aria-hidden="true"></span>
       <button class="panel-collapse-btn pp-collapse-btn" data-collapse-target="pp-toggles" title="Collapse panel">&#x25C0;</button>
     </div>
+    <div class="pp-panel-body" data-rail-scroller>
     <div class="pp-toggle-group">
       <button class="pp-toggle-btn" id="hud-toggle" title="Intelligence HUD (H)">
         <span class="pp-icon">&#x25CE;</span>
@@ -383,7 +439,38 @@
           <option value="tactical">Tactical</option>
           <option value="operator">Operator</option>
           <option value="minimal">Minimal</option>
+          <option value="cyber">Cyber</option>
         </select>
+      </div>
+      <div class="pp-slider-row cyber-sonar-control cyber-sonar-toggle-row" id="cyber-sonar-row">
+        <span class="pp-slider-mini-label">Sonar</span>
+        <button class="pp-mode-btn active" id="cyber-sonar-toggle" title="Cyber sonar contact scanner" aria-label="Cyber sonar contact scanner" aria-pressed="true">ON</button>
+      </div>
+      <output id="cyber-sonar-status" class="cyber-sonar-control" role="status"></output>
+      <div class="pp-slider-row cyber-sonar-control cyber-sonar-setting" id="cyber-sonar-rings-row">
+        <label class="pp-slider-mini-label" for="cyber-sonar-rings">Rings</label>
+        <input type="range" class="pp-slider" id="cyber-sonar-rings" min="3" max="12" step="1" value="8" aria-label="Sonar ring count" />
+        <span class="pp-slider-value" id="cyber-sonar-rings-value">8</span>
+      </div>
+      <div class="pp-slider-row cyber-sonar-control cyber-sonar-setting" id="cyber-sonar-range-row">
+        <label class="pp-slider-mini-label" for="cyber-sonar-range">Range</label>
+        <input type="range" class="pp-slider" id="cyber-sonar-range" min="60" max="120" step="1" value="100" aria-label="Sonar ring range" />
+        <span class="pp-slider-value" id="cyber-sonar-range-value">100%</span>
+      </div>
+      <div class="pp-slider-row cyber-sonar-control cyber-sonar-setting" id="cyber-sonar-intensity-row">
+        <label class="pp-slider-mini-label" for="cyber-sonar-intensity">Power</label>
+        <input type="range" class="pp-slider" id="cyber-sonar-intensity" min="0" max="100" step="1" value="70" aria-label="Sonar intensity" />
+        <span class="pp-slider-value" id="cyber-sonar-intensity-value">70%</span>
+      </div>
+      <div class="pp-slider-row cyber-sonar-control cyber-sonar-setting" id="cyber-sonar-opacity-row">
+        <label class="pp-slider-mini-label" for="cyber-sonar-opacity">Opacity</label>
+        <input type="range" class="pp-slider" id="cyber-sonar-opacity" min="35" max="100" step="1" value="84" aria-label="Cyber contact and label opacity" title="Minimum opacity for map dots, icons, models, brackets, and labels between sonar passes" />
+        <span class="pp-slider-value" id="cyber-sonar-opacity-value">84%</span>
+      </div>
+      <div class="pp-slider-row cyber-sonar-control cyber-sonar-setting" id="cyber-sonar-sector-row">
+        <label class="pp-slider-mini-label" for="cyber-sonar-sector">Sector</label>
+        <input type="range" class="pp-slider" id="cyber-sonar-sector" min="8" max="60" step="1" value="24" aria-label="Sonar sector width" />
+        <span class="pp-slider-value" id="cyber-sonar-sector-value">24°</span>
       </div>
     </div>
     <div class="pp-toggle-group">
@@ -452,8 +539,34 @@
              mirrors SCOPE_FEATHER_RATIO_DEFAULT in src/scopeMask.js. Feather
              softens the black mask edge; label fading is the separate Fade
              slider. -->
-        <input type="range" class="pp-slider" id="scope-feather-slider" min="0" max="100" value="11" title="Scope edge feather as a percentage of the keyhole radius" />
+        <input type="range" class="pp-slider" id="scope-feather-slider" min="0" max="100" value="11" aria-label="Scope edge feather" title="Scope edge feather as a percentage of the keyhole radius" />
         <span class="pp-slider-value" id="scope-feather-value">11%</span>
+      </div>
+    </div>
+    <div class="pp-toggle-group">
+      <button class="pp-toggle-btn" id="draw-toggle" title="Draw on the world — click vertices, double-click or Enter to finish, Esc to cancel" aria-pressed="false">
+        <span class="pp-icon material-symbols-outlined" aria-hidden="true">draw</span>
+        <span class="pp-label">Draw</span>
+      </button>
+      <div class="pp-slider-row" id="draw-mode-row">
+        <span class="pp-slider-mini-label">Shape</span>
+        <div class="pp-mode-seg" role="radiogroup" aria-label="Shape to draw">
+          <button class="pp-mode-btn active" data-shape="area" role="radio" aria-checked="true">Area</button>
+          <button class="pp-mode-btn" data-shape="line" role="radio" aria-checked="false">Line</button>
+          <button class="pp-mode-btn" data-shape="pin" role="radio" aria-checked="false">Pin</button>
+        </div>
+      </div>
+      <div class="pp-slider-row" id="draw-label-row">
+        <input type="text" class="pp-text-input" id="draw-label-input" maxlength="120" placeholder="Label (optional)" aria-label="Label for the drawn shape" autocomplete="off" spellcheck="false">
+        <select class="pp-select draw-color-select" id="draw-color-select" aria-label="Colour of the drawn shape">
+          <option value="primary">Primary</option>
+          <option value="amber">Amber</option>
+          <option value="cyan">Cyan</option>
+          <option value="green">Green</option>
+          <option value="red">Red</option>
+        </select>
+        <button class="pp-mode-btn draw-clear-btn" id="draw-clear" type="button" title="Remove every mark from the board">Clear</button>
+        <span class="draw-hint" id="draw-hint" aria-live="polite"></span>
       </div>
     </div>
     <div class="pp-toggle-group">
@@ -472,7 +585,7 @@
         <span class="pp-label">Bloom</span>
       </button>
       <div class="pp-slider-row" id="bloom-slider-row">
-        <input type="range" class="pp-slider" id="bloom-intensity-slider" min="0" max="200" value="0" />
+        <input type="range" class="pp-slider" id="bloom-intensity-slider" min="0" max="200" value="0" aria-label="Bloom intensity" />
         <span class="pp-slider-value" id="bloom-intensity-value">0%</span>
       </div>
     </div>
@@ -482,10 +595,11 @@
         <span class="pp-label">Sharpen</span>
       </button>
       <div class="pp-slider-row" id="sharpen-slider-row">
-        <input type="range" class="pp-slider" id="sharpen-intensity-slider" min="0" max="100" value="49" />
+        <input type="range" class="pp-slider" id="sharpen-intensity-slider" min="0" max="100" value="49" aria-label="Sharpen intensity" />
         <span class="pp-slider-value" id="sharpen-intensity-value">49%</span>
       </div>
     </div>
+  </div>
   </div>
   <button id="clean-view-exit" title="Return UI controls">EXIT CLEAN VIEW</button>
 
@@ -504,37 +618,37 @@
       <div id="control-panel-popover" class="dock-popover-content">
       <button class="dock-pin-btn" data-pin-target="control-panel" type="button" aria-label="Pin visual presets" aria-pressed="false" title="Keep visual presets open"><img src="/pin.svg" alt="" /></button>
       <div id="style-buttons" class="button-grid">
-        <button class="style-btn active" data-style="normal">
+        <button class="style-btn active" data-style="normal" title="Show the globe without a visual filter.">
           <span class="btn-icon">◯</span>
           <span class="btn-label">Normal</span>
           <span class="btn-key">1</span>
         </button>
-        <button class="style-btn" data-style="retro">
+        <button class="style-btn" data-style="retro" title="Emulate a green phosphor CRT with scanlines and screen curvature.">
           <span class="btn-icon">▦</span>
           <span class="btn-label">CRT</span>
           <span class="btn-key">2</span>
         </button>
-        <button class="style-btn" data-style="surveillance">
+        <button class="style-btn" data-style="surveillance" title="Simulate night-vision goggles with green intensification and a tube vignette.">
           <span class="btn-icon">🌙</span>
           <span class="btn-label">NVG</span>
           <span class="btn-key">3</span>
         </button>
-        <button class="style-btn" data-style="thermal">
+        <button class="style-btn" data-style="thermal" title="Simulate FLIR-style thermal contrast. Turn up Ironbow for color.">
           <span class="btn-icon">🌡️</span>
           <span class="btn-label">FLIR</span>
           <span class="btn-key">4</span>
         </button>
-        <button class="style-btn" data-style="anime">
+        <button class="style-btn" data-style="anime" title="Apply bright cel-shaded color and illustrated outlines.">
           <span class="btn-icon">✦</span>
           <span class="btn-label">Anime</span>
           <span class="btn-key">5</span>
         </button>
-        <button class="style-btn" data-style="noir">
+        <button class="style-btn" data-style="noir" title="Apply high-contrast monochrome film-noir grading.">
           <span class="btn-icon">◐</span>
           <span class="btn-label">Noir</span>
           <span class="btn-key">6</span>
         </button>
-        <button class="style-btn" data-style="snow">
+        <button class="style-btn" data-style="snow" title="Add a cold, snowy whiteout treatment to the scene.">
           <span class="btn-icon">❄</span>
           <span class="btn-label">Snow</span>
           <span class="btn-key">7</span>
@@ -560,27 +674,26 @@
     <div class="panel-glow"></div>
     <div class="location-inner">
       <div class="location-toolbar">
-        <span class="location-toolbar-label"><span class="dock-label-icon dock-label-icon-location" aria-hidden="true"></span>LOCATION</span>
+        <button id="location-bar-toggle" class="dock-tray-toggle" type="button" data-dock-toggle-target="location-bar" aria-controls="location-bar-popover" aria-expanded="false" aria-label="Expand LOCATION" title="Expand LOCATION">
+          <span class="location-toolbar-label"><span class="dock-label-icon dock-label-icon-location" aria-hidden="true"></span>LOCATION</span>
+        </button>
         <button class="panel-collapse-btn" data-collapse-target="location-bar" title="Collapse panel">+</button>
       </div>
       <div id="location-mini-status" class="location-mini-status" aria-live="polite">
         <div id="location-mini-city" class="location-mini-city">📍 Location: --</div>
         <div id="location-mini-poi" class="location-mini-poi">Landmark: --</div>
       </div>
-      <div class="dock-popover-content">
+      <div id="location-bar-popover" class="dock-popover-content">
         <button class="dock-pin-btn" data-pin-target="location-bar" type="button" aria-label="Pin location tray" aria-pressed="false" title="Keep location tray open"><img src="/pin.svg" alt="" /></button>
         <div id="poi-row" class="poi-row-container"></div>
         <div class="location-bar-divider" id="location-bar-divider"></div>
         <div class="location-city-row">
           <div id="location-pills" class="location-pills"></div>
           <div class="location-search-wrap">
-            <button id="location-gps-btn" class="search-toggle-btn" type="button" title="Go to my GPS location" aria-label="Go to device GPS location">
-              <span class="material-symbols-outlined" style="font-size: 14px;">my_location</span>
-            </button>
             <button id="search-toggle" class="search-toggle-btn" title="Search any location">
               <span>&#x1F50E;</span>
             </button>
-            <input type="text" id="location-search" placeholder="Search any location..." autocomplete="off" spellcheck="false" />
+            <input type="text" id="location-search" placeholder="Search any location..." autocomplete="off" spellcheck="false" aria-label="Search location by name or coordinates" />
           </div>
         </div>
       </div>
@@ -605,20 +718,23 @@
   <!-- CCTV Coverage Panel -->
   <div id="cctv-panel" class="panel-collapsible collapsed" data-panel-id="cctv-panel">
     <div class="panel-glow"></div>
-    <div class="cctv-panel-inner">
+    <div class="cctv-panel-inner" data-rail-scroller>
       <div class="panel-header">
         <span class="panel-title">CCTV</span>
         <span class="panel-divider"></span>
         <button class="panel-collapse-btn" data-collapse-target="cctv-panel" title="Collapse panel">+</button>
       </div>
+      <div class="cyber-panel-body" data-rail-scroller>
       <div id="cctv-frame-wrap" class="cctv-frame-wrap">
         <img id="cctv-frame" alt="CCTV feed frame" />
+        <canvas id="cctv-video" class="cctv-frame" hidden></canvas>
       </div>
       <div id="cctv-source-badge" role="status" aria-live="polite">SOURCE · UNKNOWN</div>
       <div id="cctv-meta">Enable CCTV to load camera intersections</div>
       <div class="cctv-controls">
         <button id="cctv-enable-btn" class="scene-btn">CCTV OFF</button>
         <button id="cctv-nearest-btn" class="scene-btn">NEAREST</button>
+        <button id="cctv-live-filter-btn" class="scene-btn" title="Filter to cameras streaming live video (e.g. DelDOT / Norway)">LIVE ONLY</button>
       </div>
       <div class="cctv-controls">
         <button id="cctv-prev-btn" class="scene-btn">PREV</button>
@@ -655,6 +771,76 @@
       </div>
       <div class="cctv-summary-label">SCENE SUMMARY</div>
       <div id="cctv-summary">Enable CCTV to start camera-linked intelligence summaries.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Street Level Panel (moved into #right-context-rail at runtime) -->
+  <div id="street-level-panel" class="panel-collapsible collapsed" data-panel-id="street-level-panel">
+    <div class="panel-glow"></div>
+    <div class="street-level-panel-inner" data-rail-scroller>
+      <div class="panel-header">
+        <span class="panel-title">STREET LEVEL</span>
+        <span class="panel-divider"></span>
+        <button id="sl-status" class="sl-status" type="button" aria-pressed="false" title="Turn Street Level on or off">OFF</button>
+        <button class="panel-collapse-btn" data-collapse-target="street-level-panel" title="Expand panel">◀</button>
+      </div>
+      <div id="sl-body" class="sl-body">
+        <div class="sl-main">
+          <div id="sl-viewer-wrap" class="sl-viewer-wrap" hidden>
+            <div class="sl-viewer-bar">
+              <div class="sl-viewer-tools">
+                <button id="sl-viewer-expand" class="scene-btn" type="button" aria-pressed="false" title="Expand the street-level view (Esc shrinks it)"><span class="sl-btn-icon" aria-hidden="true">⤢</span><span class="sl-btn-text">EXPAND</span></button>
+                <div class="sl-seg" role="radiogroup" aria-label="Image fit">
+                  <button type="button" class="sl-seg-btn is-active" data-sl-render="letterbox" role="radio" aria-checked="true" title="Fit: show the whole photo, with dark bars where its shape differs from the frame">FIT</button>
+                  <button type="button" class="sl-seg-btn" data-sl-render="fill" role="radio" aria-checked="false" tabindex="-1" title="Fill: fill the frame edge to edge, cropping the photo">FILL</button>
+                </div>
+                <button id="sl-follow-btn" class="scene-btn" type="button" aria-pressed="false" aria-label="Camera follows view" title="Camera follows view: move the globe camera wherever the street-level view looks"><span class="sl-btn-icon" aria-hidden="true">⌖</span><span class="sl-btn-text">FOLLOW</span></button>
+              </div>
+              <div class="sl-viewer-tools sl-viewer-tools-right">
+                <button id="sl-viewer-close" class="sl-viewer-x" type="button" title="Close the image and deselect it on the map" aria-label="Close the street-level image">×</button>
+              </div>
+            </div>
+            <div class="sl-viewer-stage">
+              <div id="sl-viewer-placeholder" class="sl-viewer-placeholder" hidden></div>
+              <div id="sl-viewer" class="sl-viewer" aria-label="Street-level viewer"></div>
+            </div>
+            <div id="sl-image-meta" class="sl-image-meta">
+              <span id="sl-image-by" class="sl-image-by"></span>
+              <span class="sl-image-right">
+                <span id="sl-image-when" class="sl-image-when"></span>
+                <a id="sl-image-link" class="sl-image-link" href="#" target="_blank" rel="noopener noreferrer" title="Open this image on the provider's site" hidden></a>
+              </span>
+            </div>
+          </div>
+          <div class="sl-settings">
+            <div class="sl-providers" role="group" aria-label="Imagery providers">
+              <span class="cctv-summary-label">PROVIDERS</span>
+              <div id="sl-provider-chips" class="sl-chips"></div>
+            </div>
+            <div id="sl-error" class="sl-error" role="alert" hidden><span aria-hidden="true">⚠</span> <span id="sl-error-text"></span></div>
+            <!-- A missing key gates the filters only: the chips above stay
+                 focusable so their tooltip can say how to add the key. -->
+            <fieldset id="sl-controls" class="sl-controls">
+              <div class="sl-filters" role="group" aria-label="Imagery filters">
+                <span class="cctv-summary-label">IMAGERY</span>
+                <div class="sl-seg" role="radiogroup" aria-label="Panorama filter">
+                  <button type="button" class="sl-seg-btn is-active" data-sl-pano="all" role="radio" aria-checked="true">ALL</button>
+                  <button type="button" class="sl-seg-btn" data-sl-pano="pano" role="radio" aria-checked="false" tabindex="-1">360°</button>
+                  <button type="button" class="sl-seg-btn" data-sl-pano="flat" role="radio" aria-checked="false" tabindex="-1">FLAT</button>
+                </div>
+              </div>
+              <div class="sl-since">
+                <label class="cctv-summary-label" for="sl-since">SINCE</label>
+                <input id="sl-since" class="sl-range" type="range" min="0" max="8" step="1" value="0" aria-valuetext="ANY DATE" aria-describedby="sl-since-label" />
+                <output id="sl-since-label" class="sl-since-label" for="sl-since">ANY DATE</output>
+              </div>
+            </fieldset>
+            <ul id="sl-legend" class="sl-legend" aria-label="Coverage colours"></ul>
+            <div id="sl-coverage-meta" class="sl-meta"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -699,9 +885,33 @@
 
   <!-- Global Context is deliberately independent from the left layer accordion. -->
   <aside id="right-context-rail">
+    <div id="weather-panel" class="panel-collapsible" data-panel-id="weather-panel" hidden>
+      <div class="panel-glow"></div>
+      <div class="weather-panel-inner" data-rail-scroller>
+        <div class="panel-header">
+          <span class="panel-title">WEATHER</span>
+          <span id="weather-panel-count" aria-label="Active weather products">0</span>
+          <span class="panel-divider"></span>
+          <button class="panel-collapse-btn" data-collapse-target="weather-panel" type="button" title="Collapse panel">▼</button>
+        </div>
+        <div id="weather-panel-body" data-rail-scroller></div>
+      </div>
+    </div>
+    <div id="recent-imagery-panel" class="panel-collapsible" data-panel-id="recent-imagery-panel" hidden>
+      <div class="panel-glow"></div>
+      <div class="recent-imagery-panel-inner" data-rail-scroller>
+        <div class="panel-header">
+          <span class="panel-title">RECENT IMAGERY</span>
+          <span id="recent-imagery-panel-count" aria-label="Imagery days in the box"></span>
+          <span class="panel-divider"></span>
+          <button class="panel-collapse-btn" data-collapse-target="recent-imagery-panel" type="button" title="Collapse panel">▼</button>
+        </div>
+        <div id="recent-imagery-panel-body" data-rail-scroller></div>
+      </div>
+    </div>
     <div id="global-context-panel" class="panel-collapsible collapsed" data-panel-id="global-context-panel">
       <div class="panel-glow"></div>
-      <div class="global-context-panel-inner">
+      <div class="global-context-panel-inner" data-rail-scroller>
         <div class="panel-header">
           <span class="panel-title">CONTEXT</span>
           <span class="panel-divider"></span>
@@ -737,12 +947,13 @@
           </div>
           <button class="panel-collapse-btn" data-collapse-target="global-context-panel" title="Expand panel">▶</button>
         </div>
+        <div class="cyber-panel-body" data-rail-scroller>
         <div class="global-context-modes" role="tablist" aria-label="Context mode">
           <button id="global-context-flights-btn" class="context-mode-button" type="button" role="tab" tabindex="0" aria-selected="false" aria-controls="context-flights-view" aria-label="CONTACTS" title="Cycles the nearest contacts of whatever type you select — planes, vessels, installations. Satellites track independently.">
             <span class="material-symbols-outlined" aria-hidden="true">radar</span>
             <span>CONTACTS</span>
           </button>
-          <button id="global-context-missions-btn" class="context-mode-button" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="context-missions-view">
+          <button id="global-context-missions-btn" class="context-mode-button" type="button" role="tab" tabindex="0" aria-selected="false" aria-controls="context-missions-view">
             <span class="material-symbols-outlined" aria-hidden="true">rocket_launch</span>
             <span>SPACE MISSIONS</span>
           </button>
@@ -780,10 +991,11 @@
               <div class="space-mission-roster-list" data-mission-roster-list>
                 <div class="space-mission-roster-empty">LOADING 30-DAY MISSION INDEX</div>
               </div>
+              <p class="space-mission-roster-focus-continuation" tabindex="-1" data-mission-roster-focus-continuation>TAB PREVIEWS · ENTER / SPACE SELECTS</p>
             </div>
           </div>
         </section>
-        <section id="radio-panel" class="panel-collapsible collapsed" data-panel-id="radio-panel" aria-label="Internet radio companion">
+        <section id="radio-panel" class="panel-collapsible collapsed" data-panel-id="radio-panel" aria-label="Internet radio and local SDR">
           <div class="radio-panel-inner">
             <div class="panel-header">
               <span class="panel-title">RADIO</span>
@@ -836,8 +1048,82 @@
               <a href="https://www.radio-browser.info/" target="_blank" rel="noopener noreferrer">DIRECTORY: RADIO BROWSER</a>
             </div>
             <p class="radio-privacy">Audio connects directly to the broadcaster after you press play. Your IP is visible to that broadcaster.</p>
+            <div id="sdr-radio-card" class="sdr-radio-card" role="group" aria-label="Local RTL-SDR receiver">
+              <div class="sdr-radio-heading">
+                <strong>LOCAL RTL-SDR</strong>
+                <span id="sdr-connection-state">NO USB</span>
+              </div>
+              <p>Chrome/Edge · WebUSB · one local tuner shared by FM and the Local ADS-B layer.</p>
+              <div class="sdr-radio-actions">
+                <button id="sdr-connect-btn" class="panel-layer-toggle" type="button" aria-pressed="false">CONNECT</button>
+                <button id="sdr-locate-btn" type="button" title="Use your location for faster ADS-B position decoding">LOCATE</button>
+                <button id="sdr-change-device-btn" type="button" title="Choose a different RTL-SDR or receiver channel">CHANGE DEVICE</button>
+              </div>
+              <div class="sdr-mode-row" role="group" aria-label="RTL-SDR receiver mode">
+                <button id="sdr-mode-fm-btn" class="active" type="button" aria-pressed="true">FM</button>
+                <button id="sdr-mode-adsb-btn" type="button" aria-pressed="false">ADS-B · 1090</button>
+              </div>
+              <div class="sdr-gain-row">
+                <label for="sdr-gain-select">GAIN</label>
+                <select id="sdr-gain-select" aria-label="RTL-SDR tuner gain for the current mode">
+                  <option value="auto">AUTO</option>
+                  <option value="0.0">0.0 dB</option>
+                  <option value="0.9">0.9 dB</option>
+                  <option value="1.4">1.4 dB</option>
+                  <option value="2.7">2.7 dB</option>
+                  <option value="3.7">3.7 dB</option>
+                  <option value="7.7">7.7 dB</option>
+                  <option value="8.7">8.7 dB</option>
+                  <option value="12.5">12.5 dB</option>
+                  <option value="14.4">14.4 dB</option>
+                  <option value="15.7">15.7 dB</option>
+                  <option value="16.6">16.6 dB</option>
+                  <option value="19.7">19.7 dB</option>
+                  <option value="20.7">20.7 dB</option>
+                  <option value="22.9">22.9 dB</option>
+                  <option value="25.4">25.4 dB</option>
+                  <option value="28.0">28.0 dB</option>
+                  <option value="29.7">29.7 dB</option>
+                  <option value="32.8">32.8 dB</option>
+                  <option value="33.8">33.8 dB</option>
+                  <option value="36.4">36.4 dB</option>
+                  <option value="37.2">37.2 dB</option>
+                  <option value="38.6">38.6 dB</option>
+                  <option value="40.2">40.2 dB</option>
+                  <option value="42.1">42.1 dB</option>
+                  <option value="43.4">43.4 dB</option>
+                  <option value="43.9">43.9 dB</option>
+                  <option value="44.5">44.5 dB</option>
+                  <option value="48.0">48.0 dB</option>
+                  <option value="49.6">49.6 dB</option>
+                </select>
+              </div>
+              <div id="sdr-adsb-stats" class="sdr-adsb-stats" role="status" aria-live="off" hidden>
+                <span><output id="sdr-stat-rate">--</output> MSG/S</span>
+                <span><output id="sdr-stat-heard">0</output> HEARD</span>
+                <span><output id="sdr-stat-positioned">0</output> POSITIONED</span>
+                <span>IQ <output id="sdr-stat-iq">--</output></span>
+              </div>
+              <div class="sdr-frequency-row">
+                <label for="sdr-frequency-input">FM MHZ</label>
+                <input id="sdr-frequency-input" type="number" min="87.5" max="108" step="0.1" value="98.5" inputmode="decimal" />
+                <button id="sdr-tune-btn" type="button">TUNE</button>
+              </div>
+              <div class="sdr-seek-row" role="group" aria-label="Seek broadcast FM stations">
+                <button id="sdr-seek-back-btn" type="button" disabled>◀ SEEK</button>
+                <button id="sdr-seek-forward-btn" type="button" disabled>SEEK ▶</button>
+              </div>
+              <label class="radio-volume-row" for="sdr-volume">
+                <span>SDR VOL</span>
+                <input id="sdr-volume" class="gev-quantitative-slider" type="range" min="0" max="100" value="80" aria-label="Local SDR volume" />
+                <output id="sdr-volume-value" class="gev-slider-value" for="sdr-volume">80%</output>
+              </label>
+              <div id="sdr-status" class="radio-playback-state" role="status" aria-live="polite">Connect an RTL-SDR to begin.</div>
+              <div id="sdr-feed-status" class="sdr-feed-status" role="status" aria-live="off" hidden></div>
+            </div>
           </div>
         </section>
+        </div>
       </div>
     </div>
   </aside>

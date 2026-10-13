@@ -1,27 +1,61 @@
+import {
+  layerSnapshot,
+  layerSnapshots,
+  feedProvenanceEnvelope,
+} from '../data/layerSnapshot.js';
+import { readLayerLifecycleSummary } from './layerSummary.js';
+import { SPEECH_BUILDERS, attachVoiceResult } from './speech.js';
+import { resolveDeicticArgs } from './deixis.js';
+export { readLayerLifecycleSummary } from './layerSummary.js';
+import { defaultGeospatial } from '../search/defaults.js';
 import * as Cesium from 'cesium';
-import { CITY_POIS, findPoiByName, flyToGlobeView, flyToLandmark, flyToPOI, flyToPresetLocation, GLOBE_VIEW, searchAndFlyTo } from '../locations.js';
+import {
+  CITY_POIS,
+  findPoiByName,
+  flyToGlobeView,
+  flyToLandmark,
+  flyToPOI,
+  flyToPresetLocation,
+  GLOBE_VIEW,
+  searchAndFlyTo,
+} from '../locations.js';
 import {
   getContextStore,
   getSelectedEntityContext,
   isContextRecordActive,
 } from '../data/contextStore.js';
-import { getNextIssPass } from '../data/satellites.js';
-import { CCTV_FOCUS_RESULT } from '../data/cctv.js';
+import { CCTV_FOCUS_RESULT } from '../layers/cctv/index.js';
 import { contextModeWord } from '../contextModePolicy.js';
-import { createAnalystEngine } from '../data/analystEngine.js';
-import { layerFeedState } from '../data/manager.js';
-import militaryAwarenessLayer, {
-  collectAircraftProximityWindow,
-  contactsWindowFromSnapshot,
-} from '../data/militaryAwareness.js';
-import { initCameraVerbs, moveCamera, flyRoute, interruptCameraMotion, adjustOrbitRange } from '../cameraVerbs.js';
-import { cachedGroundFloor, warmGroundFloor } from '../data/groundFloor.js';
+import {
+  createAnalystEngine,
+  normalizeAnalystSpec,
+  selectAnalystRows,
+} from '../data/analystEngine.js';
+import { voiceLayer, voiceLayerAliasMap } from './layerManifest.js';
+import { layerFeedState } from '../data/feedState.js';
+import {
+  initCameraVerbs,
+  moveCamera,
+  flyRoute,
+  interruptCameraMotion,
+  adjustOrbitRange,
+} from '../cameraVerbs.js';
+import * as defaultFloorServices from '../data/groundFloor.js';
 import { isPickedWorldPosition } from '../data/scenePick.js';
-import { resolveRegionRingForQuery } from '../annotations/annotationResolver.js';
+import { unavailablePlaceSearch } from '../search/placeSearch.js';
+import * as defaultAnnotationResolver from '../annotations/annotationResolver.js';
 import { normalizeRadioCountryInput } from '../data/radioCountry.js';
 import { TR3B_CLASS } from '../data/tr3bRegistry.js';
 
-const ALLOWED_STYLES = new Set(['normal', 'retro', 'surveillance', 'thermal', 'anime', 'noir', 'snow']);
+const ALLOWED_STYLES = new Set([
+  'normal',
+  'retro',
+  'surveillance',
+  'thermal',
+  'anime',
+  'noir',
+  'snow',
+]);
 const PANEL_ALIASES = new Map([
   ['data', 'data-panel'],
   ['data layers', 'data-panel'],
@@ -52,9 +86,24 @@ const PANEL_ALIASES = new Map([
   ['basemap', 'control-panel'],
   ['map sources', 'control-panel'],
   ['sources', 'control-panel'],
+  ['weather', 'weather-panel'],
+  ['weather panel', 'weather-panel'],
+  ['recent imagery', 'recent-imagery-panel'],
+  ['imagery panel', 'recent-imagery-panel'],
 ]);
 
-const PANEL_IDS = new Set(['data-panel', 'location-bar', 'control-panel', 'cctv-panel', 'radio-panel', 'global-context-panel', 'scene-panel', 'pp-toggles']);
+const PANEL_IDS = new Set([
+  'data-panel',
+  'location-bar',
+  'control-panel',
+  'cctv-panel',
+  'radio-panel',
+  'global-context-panel',
+  'scene-panel',
+  'pp-toggles',
+  'weather-panel',
+  'recent-imagery-panel',
+]);
 const CONTEXT_MODE_ALIASES = new Map([
   ['off', 'off'],
   ['none', 'off'],
@@ -83,7 +132,10 @@ const CONTEXT_MODE_RESULT_FIELDS = Object.freeze([
 ]);
 
 /** Nested results that are themselves context-mode payloads the model reads. */
-const NESTED_CONTEXT_RESULT_FIELDS = Object.freeze(['context', 'contextRollback']);
+const NESTED_CONTEXT_RESULT_FIELDS = Object.freeze([
+  'context',
+  'contextRollback',
+]);
 
 /**
  * Report a context-mode payload in the tools' own vocabulary.
@@ -139,44 +191,16 @@ const COCKPIT_ACTION_ALIASES = new Map([
   ['next closest military', 'next'],
   ['go to next', 'next'],
 ]);
-const COCKPIT_TARGET_LAYERS = new Set(['flights', 'military', 'ais-live-vessels', 'military-installations']);
-
-const LAYER_ALIASES = new Map([
-  ['flights', 'flights'],
-  ['planes', 'flights'],
-  ['aircraft', 'flights'],
-  ['military', 'military'],
-  ['military flights', 'military'],
-  ['earthquakes', 'earthquakes'],
-  ['quakes', 'earthquakes'],
-  ['satellites', 'satellites'],
-  ['space mission', 'rocket-launches'],
-  ['space missions', 'rocket-launches'],
-  ['missions', 'rocket-launches'],
-  ['traffic', 'traffic'],
-  ['street traffic', 'traffic'],
-  ['cctv', 'cctv'],
-  ['cameras', 'cctv'],
-  ['radio', 'radio'],
-  ['internet radio', 'radio'],
-  ['radio stations', 'radio'],
-  ['bikeshare', 'bikeshare'],
-  ['bikes', 'bikeshare'],
-  ['ais', 'ais-live-vessels'],
-  ['ships', 'ais-live-vessels'],
-  ['vessels', 'ais-live-vessels'],
-  ['live vessels', 'ais-live-vessels'],
-  ['datacenters', 'local-datacenters'],
-  ['data centers', 'local-datacenters'],
-  ['data centres', 'local-datacenters'],
-  ['dams', 'local-dams'],
-  ['submarine cables', 'telegeography-submarine-cables'],
-  ['cables', 'telegeography-submarine-cables'],
-  ['telegeography', 'telegeography-submarine-cables'],
-  ['firms', 'local-firms'],
-  ['fires', 'local-firms'],
-  ['active fires', 'local-firms'],
+const COCKPIT_TARGET_LAYERS = new Set([
+  'flights',
+  'military',
+  'ais-live-vessels',
+  'military-installations',
 ]);
+
+// Spoken layer names come from the voice layer manifest, the same source the
+// Realtime tool enums are generated from.
+const LAYER_ALIASES = voiceLayerAliasMap();
 
 const CITY_ALIASES = new Map([
   ['new york', 'nyc'],
@@ -239,61 +263,85 @@ const FRAME_TARGETS = new Map([
   ['ships', 'ais-live-vessels'],
 ]);
 
-const reverseGeocodeCache = new Map();
-const reverseGeocodeInFlight = new Map();
-const nearbyPlacesCache = new Map();
-const nearbyPlacesInFlight = new Map();
+const serviceCaches = new WeakMap();
+function cachesFor(service) {
+  service.signal?.throwIfAborted();
+  let caches = serviceCaches.get(service);
+  if (!caches) {
+    caches = {
+      reverseGeocodeCache: new Map(),
+      reverseGeocodeInFlight: new Map(),
+      nearbyPlacesCache: new Map(),
+      nearbyPlacesInFlight: new Map(),
+    };
+    serviceCaches.set(service, caches);
+    service.signal?.addEventListener(
+      'abort',
+      () => {
+        for (const cache of Object.values(caches)) cache.clear();
+      },
+      { once: true },
+    );
+  }
+  return caches;
+}
 const VISIBLE_ENTITY_SHORTLIST = 64;
 const BASEMAP_CONTEXT_WAIT_MS = 1500;
 const viewTargetCache = new WeakMap();
 
-/**
- * Read one layer's authoritative visibility and lifecycle presentation state.
- * Falls back to stable enabled/disabled state for lightweight adapters that do
- * not expose the manager lifecycle API.
- * @param {object|null} dataManager Layer manager or lightweight adapter.
- * @param {string} layerId Registered layer identifier.
- * @param {object} [options] Fallback options.
- * @param {boolean} [options.fallbackEnabled=false] Observed state when no manager read is available.
- * @returns {{enabled:boolean,lifecycleState:string,lifecycleUncertain:boolean}} Lifecycle summary.
- */
-export function readLayerLifecycleSummary(dataManager, layerId, { fallbackEnabled = false } = {}) {
-  let lifecycle = null;
-  try {
-    lifecycle = dataManager?.getLayerLifecycleState?.(layerId) || null;
-  } catch {
-    lifecycle = null;
-  }
-  if (lifecycle) {
-    const enabled = Boolean(lifecycle.enabled);
-    return {
-      enabled,
-      lifecycleState: lifecycle.lifecycleState || (enabled ? 'enabled' : 'disabled'),
-      lifecycleUncertain: Boolean(lifecycle.uncertain ?? lifecycle.lifecycleUncertain),
-    };
-  }
-
-  let enabled = Boolean(fallbackEnabled);
-  try {
-    const managerEnabled = dataManager?.isEnabled?.(layerId);
-    if (typeof managerEnabled === 'boolean') enabled = managerEnabled;
-  } catch {
-    // Retain the caller's observed fallback when the lightweight adapter fails.
-  }
-  return {
-    enabled,
-    lifecycleState: enabled ? 'enabled' : 'disabled',
-    lifecycleUncertain: false,
-  };
-}
-
-export function createGevActionRunner({ viewer, styleManager, dataManager, sceneDirector = null, annotations = null }) {
+/** Create application actions over the supplied scene and services. */
+export function createGevActionRunner({
+  viewer,
+  styleManager,
+  dataManager,
+  sceneDirector = null,
+  annotations = null,
+  placeSearch = unavailablePlaceSearch,
+  floorServices = defaultFloorServices,
+  annotationResolver = defaultAnnotationResolver,
+  searchNavigation = searchAndFlyTo,
+  speechBuilders = null,
+  deixis = null,
+}) {
+  // Voice enable times and analyst follow-up memory belong to this runner.
+  // Speech builders turn results into say/display envelopes; callers extend
+  // them (e.g. an analyst_query builder) without replacing the defaults.
+  const builders = speechBuilders
+    ? { ...SPEECH_BUILDERS, ...speechBuilders }
+    : SPEECH_BUILDERS;
+  const _layerEnabledAt = new Map();
+  let analystEngine;
+  const resolveRegionRing = (name, signal) =>
+    annotationResolver.resolveRegionRingForQuery(name, signal, placeSearch);
+  const ensureAnalystEngine = () =>
+    (analystEngine ||= createAnalystEngine(
+      analystProviders(viewer, dataManager, {
+        placeSearch,
+        resolveRegionRing,
+        isWarming: (layerKey) => layerIsWarming(_layerEnabledAt, layerKey),
+      }),
+    ));
   installViewTargetPrewarm(viewer);
   initCameraVerbs(viewer, getViewTargetCartesian);
-  return async function runGevAction(name, rawArgs = {}, runOptions = {}) {
+  // Nested calls (select_nearest_aircraft composing layer + flight) use the
+  // raw runner; only the outer call gets a voice envelope.
+  const runGevAction = async function runGevAction(
+    name,
+    rawArgs = {},
+    runOptions = {},
+  ) {
     const args = rawArgs && typeof rawArgs === 'object' ? rawArgs : {};
-    const current = () => !runOptions.signal?.aborted
-      && (typeof runOptions.isCurrent !== 'function' || runOptions.isCurrent());
+    const current = () =>
+      !runOptions.signal?.aborted &&
+      (typeof runOptions.isCurrent !== 'function' || runOptions.isCurrent());
+    // Step reports for voice narration and the voice card; never fatal.
+    const reportProgress = (step, label = '') => {
+      try {
+        runOptions.progress?.({ step, label: String(label || '') });
+      } catch {
+        /* Progress is advisory. */
+      }
+    };
 
     // Navigation tools interrupt any continuous camera motion (spec §1.1) —
     // checked FIRST because each handler returns.
@@ -314,7 +362,13 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       const amt = String(args.amount || 'medium').toLowerCase();
       const factor = { little: 1.25, medium: 1.6, lot: 2.4 }[amt] || 1.6;
       if (adjustOrbitRange(zoomOut ? factor : 1 / factor)) {
-        return { ok: true, action: 'adjust_camera_zoom', direction: zoomOut ? 'out' : 'in', amount: amt, orbitRadiusAdjusted: true };
+        return {
+          ok: true,
+          action: 'adjust_camera_zoom',
+          direction: zoomOut ? 'out' : 'in',
+          amount: amt,
+          orbitRadiusAdjusted: true,
+        };
       }
     }
 
@@ -336,6 +390,10 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         throw new Error(`Unknown data layer: ${args.layerId || 'missing'}`);
       }
       const enabled = Boolean(args.enabled);
+      if (enabled) {
+        const pending = dataManager.getAll?.().find((l) => l.id === layerId);
+        reportProgress('layer', pending?.name || layerId);
+      }
       const changeOptions = { origin: 'voice' };
       if (runOptions.signal) changeOptions.signal = runOptions.signal;
       let changed = false;
@@ -343,13 +401,24 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       let intentOutcome = null;
       try {
         if (typeof dataManager._setEnabledWithIntent === 'function') {
-          const intent = dataManager._setEnabledWithIntent(layerId, enabled, changeOptions);
+          const intent = dataManager._setEnabledWithIntent(
+            layerId,
+            enabled,
+            changeOptions,
+          );
           changed = await intent.promise;
           if (Number.isInteger(intent.intentEpoch)) {
-            intentOutcome = await dataManager._waitForVisibilityIntent?.(layerId, intent.intentEpoch);
+            intentOutcome = await dataManager._waitForVisibilityIntent?.(
+              layerId,
+              intent.intentEpoch,
+            );
           }
         } else {
-          changed = await dataManager.setEnabled(layerId, enabled, changeOptions);
+          changed = await dataManager.setEnabled(
+            layerId,
+            enabled,
+            changeOptions,
+          );
         }
         if (layerId === 'rocket-launches' || layerId === 'satellites') {
           await styleManager?._waitForContextLayerSettlement?.();
@@ -358,7 +427,10 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         changeError = error;
       }
       const lifecycleSummary = readLayerLifecycleSummary(dataManager, layerId);
-      if (intentOutcome?.succeeded === false && intentOutcome.cancellationReason) {
+      if (
+        intentOutcome?.succeeded === false &&
+        intentOutcome.cancellationReason
+      ) {
         return {
           ok: false,
           action: 'set_layer_visibility',
@@ -373,8 +445,9 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         };
       }
       const intentCommitted = intentOutcome?.succeeded === true;
-      const current = !runOptions.signal?.aborted
-        && (typeof runOptions.isCurrent !== 'function' || runOptions.isCurrent());
+      const current =
+        !runOptions.signal?.aborted &&
+        (typeof runOptions.isCurrent !== 'function' || runOptions.isCurrent());
       if (!current && !intentCommitted) {
         return {
           ok: false,
@@ -386,18 +459,26 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         };
       }
       const settledEnabled = lifecycleSummary.enabled;
-      const lifecycleSettled = lifecycleSummary.lifecycleState === (enabled ? 'enabled' : 'disabled')
-        && !lifecycleSummary.lifecycleUncertain;
+      const lifecycleSettled =
+        lifecycleSummary.lifecycleState ===
+          (enabled ? 'enabled' : 'disabled') &&
+        !lifecycleSummary.lifecycleUncertain;
       if (changeError) {
         return {
           ok: false,
           action: 'set_layer_visibility',
           layerId,
-          error: changeError?.message || `Could not ${enabled ? 'enable' : 'disable'} the requested layer`,
+          error:
+            changeError?.message ||
+            `Could not ${enabled ? 'enable' : 'disable'} the requested layer`,
           ...lifecycleSummary,
         };
       }
-      if (changed === false || settledEnabled !== enabled || !lifecycleSettled) {
+      if (
+        changed === false ||
+        settledEnabled !== enabled ||
+        !lifecycleSettled
+      ) {
         return {
           ok: false,
           action: 'set_layer_visibility',
@@ -408,12 +489,15 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       }
       if (enabled) _layerEnabledAt.set(layerId, Date.now());
       const layer = dataManager.getAll().find((item) => item.id === layerId);
+      const snapshot = layer && enabled ? layerSnapshot(layer) : null;
       return {
         ok: true,
         action: 'set_layer_visibility',
         layerId,
         label: layer?.name || layerId,
         ...lifecycleSummary,
+        ...(snapshot?.feedState ? { feedState: snapshot.feedState } : {}),
+        ...(snapshot?.source ? { source: snapshot.source } : {}),
       };
     }
 
@@ -423,36 +507,45 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         return {
           ok: false,
           action: 'select_nearest_aircraft',
-          error: 'Nearest-aircraft selection supports Flights or Military Flights only',
+          error:
+            'Nearest-aircraft selection supports Flights or Military Flights only',
         };
       }
       const hasLocationId = Boolean(String(args.locationId || '').trim());
       const hasLocationQuery = Boolean(String(args.locationQuery || '').trim());
-      const hasCoordinates = args.latitude != null
-        && args.longitude != null
-        && Number.isFinite(Number(args.latitude))
-        && Number.isFinite(Number(args.longitude));
+      const hasCoordinates =
+        args.latitude != null &&
+        args.longitude != null &&
+        Number.isFinite(Number(args.latitude)) &&
+        Number.isFinite(Number(args.longitude));
       if (!hasLocationId && !hasLocationQuery && !hasCoordinates) {
         return {
           ok: false,
           action: 'select_nearest_aircraft',
           stage: 'location',
-          error: 'Nearest-aircraft selection needs a preset, place name, or latitude and longitude',
+          error:
+            'Nearest-aircraft selection needs a preset, place name, or latitude and longitude',
         };
       }
       const locationArgs = {
         waitForArrival: true,
         ...(args.locationId ? { locationId: args.locationId } : {}),
         ...(args.locationQuery ? { query: args.locationQuery } : {}),
-        ...(hasCoordinates ? {
-          latitude: Number(args.latitude),
-          longitude: Number(args.longitude),
-        } : {}),
+        ...(hasCoordinates
+          ? {
+              latitude: Number(args.latitude),
+              longitude: Number(args.longitude),
+            }
+          : {}),
       };
-      const layer = await runGevAction('set_layer_visibility', {
-        layerId,
-        enabled: true,
-      }, runOptions);
+      const layer = await runGevAction(
+        'set_layer_visibility',
+        {
+          layerId,
+          enabled: true,
+        },
+        runOptions,
+      );
       if (layer?.ok !== true || !current()) {
         return {
           ok: false,
@@ -464,14 +557,20 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         };
       }
 
-      const location = await runGevAction('fly_to_location', locationArgs, runOptions);
+      const location = await runGevAction(
+        'fly_to_location',
+        locationArgs,
+        runOptions,
+      );
       if (location?.ok !== true || !current()) {
         return {
           ok: false,
           action: 'select_nearest_aircraft',
           stage: 'location',
           cancelled: !current() || Boolean(location?.cancelled),
-          error: location?.error || `Could not arrive at ${location?.label || args.locationQuery || args.locationId || 'the requested place'}`,
+          error:
+            location?.error ||
+            `Could not arrive at ${location?.label || args.locationQuery || args.locationId || 'the requested place'}`,
           location,
           layer,
         };
@@ -479,11 +578,17 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
 
       const layerModule = dataManager.layers.get(layerId)?.module || null;
       let refreshed = false;
+      reportProgress('refresh', location.label);
       try {
         if (typeof dataManager.refreshLayer === 'function') {
-          refreshed = await dataManager.refreshLayer(layerId, { signal: runOptions.signal });
+          refreshed = await dataManager.refreshLayer(layerId, {
+            signal: runOptions.signal,
+          });
         } else if (typeof layerModule?.update === 'function') {
-          refreshed = (await layerModule.update(viewer, { signal: runOptions.signal })) !== false;
+          refreshed =
+            (await layerModule.update(viewer, {
+              signal: runOptions.signal,
+            })) !== false;
         }
       } catch {
         refreshed = false;
@@ -502,16 +607,24 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
         };
       }
       const stats = layerModule?.getStats?.() || {};
-      const source = String(stats.source || layerModule?.source || '').trim() || null;
+      const source =
+        String(stats.source || layerModule?.source || '').trim() || null;
       const feed = {
         state: layerFeedState({ ...stats, source }),
         source,
-        count: Number.isFinite(Number(stats.count)) ? Number(stats.count) : null,
+        count: Number.isFinite(Number(stats.count))
+          ? Number(stats.count)
+          : null,
       };
 
-      const nearest = await createAnalystEngine(analystProviders(viewer, dataManager, {
-        recordLimitByLayer: { [layerId]: Number.MAX_SAFE_INTEGER },
-      })).query({
+      reportProgress('nearest', location.label);
+      const nearest = await createAnalystEngine(
+        analystProviders(viewer, dataManager, {
+          recordLimitByLayer: { [layerId]: Number.MAX_SAFE_INTEGER },
+          placeSearch,
+          resolveRegionRing,
+        }),
+      ).query({
         layers: [layerId],
         scope: { kind: 'view' },
         filters: [{ field: 'onGround', op: 'eq', value: false }],
@@ -528,9 +641,9 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
           cancelled: !current(),
           error: !current()
             ? 'Nearest-aircraft selection was cancelled'
-            : (feed.state === 'unavailable'
+            : feed.state === 'unavailable'
               ? `${layer.label || layerId} is enabled, but ${feed.source || 'its aircraft feed'} is unavailable`
-              : `${layer.label || layerId} is enabled${feed.state === 'fallback' ? ` on the ${feed.source || 'fallback'} feed` : ''}, but no airborne aircraft is loaded in the ${location.label || 'destination'} view yet`),
+              : `${layer.label || layerId} is enabled${feed.state === 'fallback' ? ` on the ${feed.source || 'fallback'} feed` : ''}, but no airborne aircraft is loaded in the ${location.label || 'destination'} view yet`,
           location,
           layer,
           feed,
@@ -548,7 +661,9 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
           ok: false,
           action: 'select_nearest_aircraft',
           stage: 'selection',
-          error: selection?.error || 'The nearest airborne aircraft could not be selected',
+          error:
+            selection?.error ||
+            'The nearest airborne aircraft could not be selected',
           location,
           layer,
           feed,
@@ -574,14 +689,18 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
 
     if (name === 'set_visual_style') {
       const style = normalizeStyle(args.style);
-      if (!style) throw new Error(`Unknown visual style: ${args.style || 'missing'}`);
-      styleManager.setStyle(style);
+      if (!style)
+        throw new Error(`Unknown visual style: ${args.style || 'missing'}`);
+      styleManager.setStyle(style, { userInitiated: true });
       return { ok: true, action: 'set_visual_style', style };
     }
 
     if (name === 'set_panel_open') {
       const panelId = normalizePanelId(args.panelId || args.panel);
-      if (!panelId) throw new Error(`Unknown panel: ${args.panelId || args.panel || 'missing'}`);
+      if (!panelId)
+        throw new Error(
+          `Unknown panel: ${args.panelId || args.panel || 'missing'}`,
+        );
       const open = args.open !== false;
       setPanelOpen(styleManager, panelId, open);
       return { ok: true, action: 'set_panel_open', panelId, open };
@@ -589,21 +708,30 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
 
     if (name === 'set_context_mode') {
       if (!styleManager?.setContextMode) {
-        return { ok: false, action: 'set_context_mode', error: 'Context mode control unavailable' };
+        return {
+          ok: false,
+          action: 'set_context_mode',
+          error: 'Context mode control unavailable',
+        };
       }
       const mode = normalizeContextMode(args.mode || args.contextMode);
-      if (mode === null && args.mode != null && String(args.mode || '').trim() !== 'off') {
+      if (
+        mode === null &&
+        args.mode != null &&
+        String(args.mode || '').trim() !== 'off'
+      ) {
         return {
           ok: false,
           action: 'set_context_mode',
           error: `Unknown context mode: ${args.mode || 'missing'}`,
         };
       }
-      const cancellationState = () => withContextModeVocabulary(
-        typeof styleManager.getContextModeState === 'function'
-          ? styleManager.getContextModeState()
-          : {},
-      );
+      const cancellationState = () =>
+        withContextModeVocabulary(
+          typeof styleManager.getContextModeState === 'function'
+            ? styleManager.getContextModeState()
+            : {},
+        );
       if (!current()) {
         return {
           ok: false,
@@ -616,22 +744,27 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       if (mode && mode !== 'off') {
         setPanelOpen(styleManager, 'global-context-panel', true);
       }
-      const result = await styleManager.setContextMode(mode === 'off' ? null : mode, {
-        signal: runOptions.signal,
-        isCurrent: runOptions.isCurrent,
-      });
+      const result = await styleManager.setContextMode(
+        mode === 'off' ? null : mode,
+        {
+          signal: runOptions.signal,
+          isCurrent: runOptions.isCurrent,
+        },
+      );
       if (!current() && result?.ok !== true) {
         return {
           ...withContextModeVocabulary(result),
           ok: false,
           action: 'set_context_mode',
           cancelled: true,
-          error: result?.error || 'Context request was cancelled before it completed',
+          error:
+            result?.error ||
+            'Context request was cancelled before it completed',
           ...cancellationState(),
         };
       }
       const contactsWindow = ['contacts', 'flights'].includes(mode)
-        ? activeContactsWindow()
+        ? activeContactsWindow(dataManager)
         : null;
       return {
         ...withContextModeVocabulary(result),
@@ -641,7 +774,11 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
 
     if (name === 'control_cockpit') {
       if (!styleManager?.controlCockpit) {
-        return { ok: false, action: 'control_cockpit', error: 'Cockpit control unavailable' };
+        return {
+          ok: false,
+          action: 'control_cockpit',
+          error: 'Cockpit control unavailable',
+        };
       }
       const rawAction = args.action || args.command;
       const action = normalizeCockpitAction(rawAction);
@@ -657,11 +794,19 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       const targetLayer = normalizeCockpitTargetLayer(
         args.targetLayer || inferred.targetLayer || args.layer || args.layerId,
       );
-      const aircraftClass = normalizeAircraftClassFilter(args.aircraftClass || inferred.aircraftClass || args.type || args.filterType);
+      const aircraftClass = normalizeAircraftClassFilter(
+        args.aircraftClass ||
+          inferred.aircraftClass ||
+          args.type ||
+          args.filterType,
+      );
       let contextChangedForEntry = false;
       let priorContextMode = null;
       let rollbackTarget = null;
-      if (action === 'enter' && typeof styleManager.setContextMode === 'function') {
+      if (
+        action === 'enter' &&
+        typeof styleManager.setContextMode === 'function'
+      ) {
         if (!current()) {
           return {
             ok: false,
@@ -672,13 +817,15 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
           };
         }
         rollbackTarget = styleManager.getAircraftTrackingTarget?.() || null;
-        const contextState = typeof styleManager.getContextModeState === 'function'
-          ? styleManager.getContextModeState()
-          : {};
+        const contextState =
+          typeof styleManager.getContextModeState === 'function'
+            ? styleManager.getContextModeState()
+            : {};
         priorContextMode = contextState?.mode || null;
-        const contactsReady = contextState?.mode === 'flights'
-          && contextState?.active !== false
-          && contextState?.changing !== true;
+        const contactsReady =
+          contextState?.mode === 'flights' &&
+          contextState?.active !== false &&
+          contextState?.changing !== true;
         if (!contactsReady) {
           const contextResult = await styleManager.setContextMode('flights', {
             signal: runOptions.signal,
@@ -693,15 +840,19 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
           if (contextResult?.ok !== true || !current()) {
             const contextRollback = contextChangedForEntry
               ? await styleManager.setContextMode(priorContextMode, {
-                claimVisualAuthority: false,
-              })
+                  claimVisualAuthority: false,
+                })
               : null;
             return {
               ok: false,
               action: 'control_cockpit',
               cancelled: !current() || Boolean(contextResult?.cancelled),
-              error: contextResult?.error || 'Contacts context could not be established for Cockpit entry',
-              context: contextResult ? withContextModeVocabulary(contextResult) : null,
+              error:
+                contextResult?.error ||
+                'Contacts context could not be established for Cockpit entry',
+              context: contextResult
+                ? withContextModeVocabulary(contextResult)
+                : null,
               contextRollback: withContextModeVocabulary(contextRollback),
               state: styleManager.getCockpitState?.() || null,
             };
@@ -711,9 +862,8 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       // Contacts activation can adopt a newer explicit aircraft selection.
       // Sample only after that transaction settles so an older voice snapshot
       // cannot overwrite the operator's newer choice.
-      const selectedTarget = action === 'enter'
-        ? selectedCockpitTarget(dataManager)
-        : null;
+      const selectedTarget =
+        action === 'enter' ? selectedCockpitTarget(dataManager) : null;
       let cockpitResult;
       try {
         cockpitResult = await styleManager.controlCockpit(action, {
@@ -731,16 +881,28 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
           state: styleManager.getCockpitState?.() || null,
         };
       }
-      if (action === 'enter' && cockpitResult?.ok !== true && contextChangedForEntry) {
-        const contextRollback = await styleManager.setContextMode(priorContextMode, {
-          // Undoing this action's own precondition — still choreography.
-          claimVisualAuthority: false,
-          ...(current() ? {
-            signal: runOptions.signal,
-            isCurrent: runOptions.isCurrent,
-          } : {}),
-        });
-        return { ...cockpitResult, contextRollback: withContextModeVocabulary(contextRollback) };
+      if (
+        action === 'enter' &&
+        cockpitResult?.ok !== true &&
+        contextChangedForEntry
+      ) {
+        const contextRollback = await styleManager.setContextMode(
+          priorContextMode,
+          {
+            // Undoing this action's own precondition — still choreography.
+            claimVisualAuthority: false,
+            ...(current()
+              ? {
+                  signal: runOptions.signal,
+                  isCurrent: runOptions.isCurrent,
+                }
+              : {}),
+          },
+        );
+        return {
+          ...cockpitResult,
+          contextRollback: withContextModeVocabulary(contextRollback),
+        };
       }
       return cockpitResult;
     }
@@ -748,36 +910,64 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
     if (name === 'show_data_layers_menu') {
       const layerId = normalizeLayerId(args.layerId || args.layer);
       setPanelOpen(styleManager, 'data-panel', true);
-      const focusedLayer = layerId && dataManager.layers.has(layerId)
-        ? focusDataLayerRow(layerId)
-        : null;
+      const focusedLayer =
+        layerId && dataManager.layers.has(layerId)
+          ? focusDataLayerRow(layerId)
+          : null;
       return {
         ok: true,
         action: 'show_data_layers_menu',
         panelId: 'data-panel',
         focusedLayer,
-        layers: dataManager.getAll()
+        layers: dataManager
+          .getAll()
           .filter((layer) => layer.showInTogglePanel !== false)
           .map((layer) => ({
-          id: layer.id,
-          name: layer.name,
-          enabled: layer.enabled,
-          count: layer.stats?.count || 0,
+            id: layer.id,
+            name: layer.name,
+            enabled: layer.enabled,
+            count: layer.stats?.count || 0,
           })),
       };
     }
 
     if (name === 'fly_to_location') {
+      // A referenced contact moves: locate it now, not from the old list.
+      if (args.entity?.layerId && args.entity?.id) {
+        const located = locateLayerEntity(dataManager, args.entity);
+        if (!located) {
+          return {
+            ok: false,
+            action: 'fly_to_location',
+            error: `${args.entity.label || args.entity.id} is no longer loaded`,
+          };
+        }
+        const { entity: _entity, ...rest } = args;
+        return runGevAction(
+          name,
+          { ...rest, latitude: located.lat, longitude: located.lon },
+          runOptions,
+        );
+      }
       return flyToRequestedLocation(viewer, args, {
-        runImmediate: typeof styleManager?.runImmediateLocationNavigation === 'function'
-          ? (navigate) => styleManager.runImmediateLocationNavigation(navigate)
-          : null,
-        beginDeferred: typeof styleManager?.beginDeferredLocationNavigation === 'function'
-          ? () => styleManager.beginDeferredLocationNavigation()
-          : null,
-        reassertDeferred: typeof styleManager?.reassertDeferredLocationNavigation === 'function'
-          ? (generation) => styleManager.reassertDeferredLocationNavigation(generation)
-          : null,
+        onProgress: reportProgress,
+        placeSearch,
+        searchNavigation,
+        signal: runOptions.signal,
+        runImmediate:
+          typeof styleManager?.runImmediateLocationNavigation === 'function'
+            ? (navigate) =>
+                styleManager.runImmediateLocationNavigation(navigate)
+            : null,
+        beginDeferred:
+          typeof styleManager?.beginDeferredLocationNavigation === 'function'
+            ? () => styleManager.beginDeferredLocationNavigation()
+            : null,
+        reassertDeferred:
+          typeof styleManager?.reassertDeferredLocationNavigation === 'function'
+            ? (generation) =>
+                styleManager.reassertDeferredLocationNavigation(generation)
+            : null,
         onStart: () => {
           if (typeof styleManager?.beginLocationNavigation === 'function') {
             styleManager.beginLocationNavigation();
@@ -809,36 +999,70 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       };
     }
 
+    if (name === 'next_satellite_pass') {
+      return nextSatellitePass(viewer, dataManager, args);
+    }
+
     if (name === 'next_iss_pass') {
-      return nextIssPass(viewer, args);
+      return nextIssPass(viewer, dataManager, args);
     }
 
     if (name === 'analyst_query') {
-      return runAnalystQuery(viewer, dataManager, args);
+      return runAnalystQuery(
+        ensureAnalystEngine(),
+        dataManager,
+        args,
+        _layerEnabledAt,
+        current,
+        runOptions.signal,
+      );
     }
 
     if (name === 'move_camera') {
-      return moveCamera(args, (navigate, releaseOptions) => runManagedVoiceNavigation(
-        styleManager, 'camera', 'move_camera', navigate, releaseOptions,
-      ));
+      return moveCamera(args, (navigate, releaseOptions) =>
+        runManagedVoiceNavigation(
+          styleManager,
+          'camera',
+          'move_camera',
+          navigate,
+          releaseOptions,
+        ),
+      );
     }
 
     if (name === 'fly_route') {
       return flyRoute(
         annotations?.list?.() || [],
         args,
-        (lat, lon) => cachedGroundFloor(lat, lon),
-        (navigate) => runManagedVoiceNavigation(styleManager, 'route', 'fly_route', navigate),
-        (cells) => warmGroundFloor(cells),
+        (lat, lon) => floorServices.cachedGroundFloor(lat, lon),
+        (navigate) =>
+          runManagedVoiceNavigation(
+            styleManager,
+            'route',
+            'fly_route',
+            navigate,
+          ),
+        (cells) => floorServices.warmGroundFloor(cells),
       );
     }
 
     if (name === 'get_entity_context') {
-      return getEntityContext(viewer, dataManager, styleManager, args);
+      return getEntityContext(
+        viewer,
+        dataManager,
+        styleManager,
+        args,
+        placeSearch,
+      );
     }
 
     if (name === 'get_current_view_state') {
-      return getCurrentViewState(viewer, styleManager, dataManager, sceneDirector);
+      return getCurrentViewState(
+        viewer,
+        styleManager,
+        dataManager,
+        sceneDirector,
+      );
     }
 
     if (name === 'set_hud') {
@@ -856,19 +1080,36 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       return { ...out, hud: styleManager.getControlState().hud };
     }
 
+    if (name === 'set_cyber_sonar') {
+      if (typeof styleManager?.setCyberSonar !== 'function') {
+        return {
+          ok: false,
+          action: 'set_cyber_sonar',
+          error: 'Cyber sonar controls are unavailable.',
+        };
+      }
+      return { action: 'set_cyber_sonar', ...styleManager.setCyberSonar(args) };
+    }
+
     if (name === 'set_detection') {
       const result = styleManager.setDetection({
         enabled: typeof args.enabled === 'boolean' ? args.enabled : undefined,
         mode: typeof args.mode === 'string' ? args.mode : undefined,
-        densityPct: Number.isFinite(Number(args.densityPct)) ? Number(args.densityPct) : undefined,
-        allocationStrategy: typeof args.allocationStrategy === 'string' ? args.allocationStrategy : undefined,
+        densityPct: Number.isFinite(Number(args.densityPct))
+          ? Number(args.densityPct)
+          : undefined,
+        allocationStrategy:
+          typeof args.allocationStrategy === 'string'
+            ? args.allocationStrategy
+            : undefined,
       });
       return { action: 'set_detection', ...result };
     }
 
     if (name === 'set_map_stack') {
       const stackId = normalizeStackId(args.stack);
-      if (!stackId) throw new Error(`Unknown map stack: ${args.stack || 'missing'}`);
+      if (!stackId)
+        throw new Error(`Unknown map stack: ${args.stack || 'missing'}`);
       const result = await styleManager.setMapStack(stackId);
       return { action: 'set_map_stack', requested: stackId, ...result };
     }
@@ -876,16 +1117,32 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
     if (name === 'set_post_processing') {
       const out = { ok: true, action: 'set_post_processing' };
       if (args.bloom && typeof args.bloom === 'object') {
-        Object.assign(out, styleManager.setBloom({
-          enabled: typeof args.bloom.enabled === 'boolean' ? args.bloom.enabled : undefined,
-          intensityPct: Number.isFinite(Number(args.bloom.intensityPct)) ? Number(args.bloom.intensityPct) : undefined,
-        }));
+        Object.assign(
+          out,
+          styleManager.setBloom({
+            enabled:
+              typeof args.bloom.enabled === 'boolean'
+                ? args.bloom.enabled
+                : undefined,
+            intensityPct: Number.isFinite(Number(args.bloom.intensityPct))
+              ? Number(args.bloom.intensityPct)
+              : undefined,
+          }),
+        );
       }
       if (args.sharpen && typeof args.sharpen === 'object') {
-        Object.assign(out, styleManager.setSharpen({
-          enabled: typeof args.sharpen.enabled === 'boolean' ? args.sharpen.enabled : undefined,
-          intensityPct: Number.isFinite(Number(args.sharpen.intensityPct)) ? Number(args.sharpen.intensityPct) : undefined,
-        }));
+        Object.assign(
+          out,
+          styleManager.setSharpen({
+            enabled:
+              typeof args.sharpen.enabled === 'boolean'
+                ? args.sharpen.enabled
+                : undefined,
+            intensityPct: Number.isFinite(Number(args.sharpen.intensityPct))
+              ? Number(args.sharpen.intensityPct)
+              : undefined,
+          }),
+        );
       }
       return out;
     }
@@ -899,11 +1156,16 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
     }
 
     if (name === 'control_radio') {
-      return controlRadio(viewer, dataManager, args, runOptions);
+      return controlRadio(viewer, dataManager, args, {
+        ...runOptions,
+        placeSearch,
+      });
     }
 
     if (name === 'track_entity') {
-      return trackEntity(viewer, dataManager, styleManager, args);
+      return trackEntity(viewer, dataManager, styleManager, args, {
+        isCurrent: current,
+      });
     }
 
     if (name === 'stop_tracking') {
@@ -915,7 +1177,7 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
     }
 
     if (name === 'annotate_map') {
-      return annotateMap(annotations, args);
+      return annotateMap(annotations, args, reportProgress);
     }
 
     if (name === 'clear_annotations') {
@@ -924,11 +1186,85 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
 
     throw new Error(`Unknown GEV tool: ${name}`);
   };
+  // Lifetimes: the runner lives for the page; conversation state — the
+  // analyst's follow-up memory and any write still in flight — lives for one
+  // voice session and is dropped by resetConversation().
+  let conversation = 0;
+  let disposed = false;
+  async function runVoiceAction(name, rawArgs = {}, callerOptions = {}) {
+    if (disposed)
+      return {
+        ok: false,
+        action: name,
+        cancelled: true,
+        error: 'Voice ended.',
+      };
+    const epoch = conversation;
+    const runOptions = {
+      ...callerOptions,
+      isCurrent: () =>
+        epoch === conversation &&
+        !disposed &&
+        (typeof callerOptions.isCurrent !== 'function' ||
+          callerOptions.isCurrent()),
+    };
+    const input = rawArgs && typeof rawArgs === 'object' ? rawArgs : {};
+    // Point-and-ask: 'pointer' and referent:n become real targets here, from
+    // the turn's pointer snapshot and the latest numbered result.
+    const deictic = resolveDeicticArgs(name, input, {
+      pointer: deixis?.pointer?.activeSnapshot?.() || null,
+      referents: deixis?.referents || null,
+      imageFrame: deixis?.imageFrame?.() || null,
+      cameraKey: deixis?.cameraKey?.() || null,
+    });
+    if (deictic.error) {
+      return attachVoiceResult(
+        name,
+        { ok: false, action: name, error: deictic.error },
+        input,
+        builders,
+      );
+    }
+    const referentGeneration = deixis?.referents?.generation?.();
+    let result = await runGevAction(name, deictic.args, runOptions);
+    if (deictic.used && result && typeof result === 'object')
+      result = { ...result, resolvedFrom: deictic.used };
+    const out = attachVoiceResult(name, result, deictic.args, builders);
+    // Only an accepted, still-current result may become "the last list": a
+    // cancelled turn or one finishing after the session ended must not
+    // repopulate a cleared registry.
+    const stillCurrent =
+      !runOptions.signal?.aborted &&
+      (typeof runOptions.isCurrent !== 'function' || runOptions.isCurrent());
+    if (stillCurrent)
+      deixis?.referents?.recordResult?.(name, out, {
+        since: referentGeneration,
+      });
+    if (stillCurrent && deictic.used?.source === 'pointer')
+      deixis?.onPointerUsed?.();
+    return out;
+  }
+  /**
+   * A voice session ended: invalidate every write still in flight, then
+   * forget the analyst's "last answer".
+   */
+  runVoiceAction.resetConversation = () => {
+    conversation++;
+    analystEngine?.reset();
+  };
+  /** Voice was removed: nothing may run or write again. */
+  runVoiceAction.dispose = () => {
+    if (disposed) return;
+    runVoiceAction.resetConversation();
+    disposed = true;
+  };
+  return runVoiceAction;
 }
 
 function selectedCockpitTarget(dataManager) {
   const selected = getSelectedEntityContext({ dataManager });
-  if (!selected || !['flights', 'military'].includes(selected.layerId)) return null;
+  if (!selected || !['flights', 'military'].includes(selected.layerId))
+    return null;
   const module = dataManager?.layers?.get(selected.layerId)?.module;
   if (!module?.trackById || typeof module.trackById !== 'function') return null;
   const id = String(selected.id || '').trim();
@@ -955,15 +1291,20 @@ function clampStr(value, max) {
 function sanitizeAnnotationSpec(spec) {
   if (!spec || typeof spec !== 'object') return spec;
   const out = { ...spec };
-  if (typeof out.target === 'string') out.target = clampStr(out.target, MAX_TARGET_LEN);
-  if (typeof out.toTarget === 'string') out.toTarget = clampStr(out.toTarget, MAX_TARGET_LEN);
-  if (typeof out.label === 'string') out.label = clampStr(out.label, MAX_LABEL_LEN);
+  if (typeof out.target === 'string')
+    out.target = clampStr(out.target, MAX_TARGET_LEN);
+  if (typeof out.toTarget === 'string')
+    out.toTarget = clampStr(out.toTarget, MAX_TARGET_LEN);
+  if (typeof out.label === 'string')
+    out.label = clampStr(out.label, MAX_LABEL_LEN);
   if (Array.isArray(out.points)) {
-    out.points = out.points.slice(0, MAX_ROUTE_POINTS).map((p) => (
-      p && typeof p === 'object' && typeof p.target === 'string'
-        ? { ...p, target: clampStr(p.target, MAX_TARGET_LEN) }
-        : p
-    ));
+    out.points = out.points
+      .slice(0, MAX_ROUTE_POINTS)
+      .map((p) =>
+        p && typeof p === 'object' && typeof p.target === 'string'
+          ? { ...p, target: clampStr(p.target, MAX_TARGET_LEN) }
+          : p,
+      );
   }
   return out;
 }
@@ -973,13 +1314,21 @@ function sanitizeAnnotationSpec(spec) {
  * talking about. Place names are resolved to real-world coordinates (and OSM
  * footprints) by the annotation engine, so the agent never has to guess pixels.
  */
-async function annotateMap(annotations, args = {}) {
+async function annotateMap(annotations, args = {}, reportProgress = () => {}) {
   if (!annotations || typeof annotations.annotate !== 'function') {
-    return { ok: false, action: 'annotate_map', error: 'Annotation engine unavailable' };
+    return {
+      ok: false,
+      action: 'annotate_map',
+      error: 'Annotation engine unavailable',
+    };
   }
   const raw = Array.isArray(args.annotations) ? args.annotations : [];
   if (!raw.length) {
-    return { ok: false, action: 'annotate_map', error: 'No annotations supplied' };
+    return {
+      ok: false,
+      action: 'annotate_map',
+      error: 'No annotations supplied',
+    };
   }
   if (raw.length > MAX_ANNOTATIONS_PER_CALL) {
     return {
@@ -989,6 +1338,8 @@ async function annotateMap(annotations, args = {}) {
     };
   }
   const requests = raw.map(sanitizeAnnotationSpec);
+  const firstTarget = requests.find((spec) => spec?.target || spec?.label);
+  reportProgress('resolve', firstTarget?.target || firstTarget?.label || '');
   const result = await annotations.annotate(requests, {
     // C1 invariant enforced in CODE (not just the prompt): the VOICE path NEVER clears as
     // a side effect of drawing — annotations accumulate/persist, and only an explicit
@@ -1003,11 +1354,17 @@ async function annotateMap(annotations, args = {}) {
   const drewSome = result.drawn > 0;
   const someFailed = result.failed > 0;
   const failedLabels = [];
-  for (const r of (result.results || [])) {
+  const pendingOutline = (result.results || []).find(
+    (r) => r.ok && r.outlinePending,
+  );
+  if (pendingOutline)
+    reportProgress('outline', pendingOutline.label || pendingOutline.target);
+  for (const r of result.results || []) {
     if (r.ok) continue;
     // Route failures carry the specific missing waypoint name(s) in failedTargets;
     // everything else names its own label/target.
-    if (Array.isArray(r.failedTargets) && r.failedTargets.length) failedLabels.push(...r.failedTargets);
+    if (Array.isArray(r.failedTargets) && r.failedTargets.length)
+      failedLabels.push(...r.failedTargets);
     else failedLabels.push(r.target || r.label || 'an unnamed place'); // target (the place) before caption
   }
   return {
@@ -1024,7 +1381,8 @@ async function annotateMap(annotations, args = {}) {
     // Progressive outlines: anchors are placed and returned immediately; footprints for
     // these items are still being traced and will appear on their own (or the mark
     // honestly stays a point). NOT a failure — the voice layer must not report it as one.
-    outlinePending: (result.results || []).some((r) => r.ok && r.outlinePending) || undefined,
+    outlinePending:
+      (result.results || []).some((r) => r.ok && r.outlinePending) || undefined,
     items: result.results,
     // Keep `error` populated whenever ANYTHING failed (partial or total) so the
     // result never reads as a clean success — but keep it STATIC (no raw place text);
@@ -1036,14 +1394,20 @@ async function annotateMap(annotations, args = {}) {
 
 function clearAnnotations(annotations) {
   if (!annotations || typeof annotations.clear !== 'function') {
-    return { ok: false, action: 'clear_annotations', error: 'Annotation engine unavailable' };
+    return {
+      ok: false,
+      action: 'clear_annotations',
+      error: 'Annotation engine unavailable',
+    };
   }
   annotations.clear();
   return { ok: true, action: 'clear_annotations' };
 }
 
 export function normalizeStackId(value) {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return null;
   return STACK_ALIASES.get(raw) || null;
 }
@@ -1054,15 +1418,28 @@ export function normalizeStackId(value) {
  */
 function controlScene(sceneDirector, args = {}) {
   if (!sceneDirector) {
-    return { ok: false, action: 'control_scene', error: 'Scene director unavailable' };
+    return {
+      ok: false,
+      action: 'control_scene',
+      error: 'Scene director unavailable',
+    };
   }
   const sceneAction = String(args.action || '').toLowerCase();
 
   if (sceneAction === 'list') {
-    return { ok: true, action: 'control_scene', scenes: sceneDirector.listScenes(), ...sceneDirector.getPlaybackStatus() };
+    return {
+      ok: true,
+      action: 'control_scene',
+      scenes: sceneDirector.listScenes(),
+      ...sceneDirector.getPlaybackStatus(),
+    };
   }
   if (sceneAction === 'status') {
-    return { ok: true, action: 'control_scene', ...sceneDirector.getPlaybackStatus() };
+    return {
+      ok: true,
+      action: 'control_scene',
+      ...sceneDirector.getPlaybackStatus(),
+    };
   }
   if (sceneAction === 'stop') {
     sceneDirector.stopScene('Stopped by voice');
@@ -1074,16 +1451,30 @@ function controlScene(sceneDirector, args = {}) {
   }
   if (sceneAction === 'play') {
     if (sceneDirector.running) {
-      return { ok: false, action: 'control_scene', error: 'A scene is already running — stop it first' };
+      return {
+        ok: false,
+        action: 'control_scene',
+        error: 'A scene is already running — stop it first',
+      };
     }
     const scene = args.sceneId
       ? sceneDirector.findSceneByQuery(args.sceneId)
-      : (sceneDirector.listScenes()[0] || null);
+      : sceneDirector.listScenes()[0] || null;
     if (!scene) {
-      return { ok: false, action: 'control_scene', error: `No scene matched "${args.sceneId || ''}"`, scenes: sceneDirector.listScenes() };
+      return {
+        ok: false,
+        action: 'control_scene',
+        error: `No scene matched "${args.sceneId || ''}"`,
+        scenes: sceneDirector.listScenes(),
+      };
     }
     void sceneDirector.startScene(scene.id, { single: true });
-    return { ok: true, action: 'control_scene', playing: scene.title, shots: scene.shots };
+    return {
+      ok: true,
+      action: 'control_scene',
+      playing: scene.title,
+      shots: scene.shots,
+    };
   }
   throw new Error(`Unknown scene action: ${args.action || 'missing'}`);
 }
@@ -1093,15 +1484,29 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
   const action = String(args.action || '').toLowerCase();
   const cctv = dataManager.layers.get('cctv')?.module;
   if (!cctv) {
-    return { ok: false, action: 'control_cctv', error: 'CCTV layer unavailable' };
+    return {
+      ok: false,
+      action: 'control_cctv',
+      error: 'CCTV layer unavailable',
+    };
   }
 
   if (action === 'enable' || action === 'disable') {
-    await dataManager.setEnabled('cctv', action === 'enable', { origin: 'voice' });
-    return { ok: true, action: 'control_cctv', enabled: dataManager.isEnabled('cctv') };
+    await dataManager.setEnabled('cctv', action === 'enable', {
+      origin: 'voice',
+    });
+    return {
+      ok: true,
+      action: 'control_cctv',
+      enabled: dataManager.isEnabled('cctv'),
+    };
   }
   if (!dataManager.isEnabled('cctv')) {
-    return { ok: false, action: 'control_cctv', error: 'CCTV layer is off — enable it first' };
+    return {
+      ok: false,
+      action: 'control_cctv',
+      error: 'CCTV layer is off — enable it first',
+    };
   }
 
   const summarize = () => {
@@ -1109,7 +1514,9 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
     return {
       activeCameraId: ui.activeCameraId || null,
       activeCamera: ui.activeCamera?.name || ui.activeCamera?.id || null,
-      cameraCount: Array.isArray(ui.cameras) ? ui.cameras.length : (ui.count || 0),
+      cameraCount: Array.isArray(ui.cameras)
+        ? ui.cameras.length
+        : ui.count || 0,
       showCoverage: !!ui.showCoverage,
       coverageMode: ui.coverageMode || (ui.showCoverage ? 'on' : 'off'),
       showProjection: !!ui.showProjection,
@@ -1119,14 +1526,26 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
   };
 
   if (action === 'select') {
-    const query = String(args.cameraQuery || '').trim().toLowerCase();
+    const query = String(args.cameraQuery || '')
+      .trim()
+      .toLowerCase();
     if (!query) throw new Error('control_cctv select needs cameraQuery');
     const cams = cctv.getUIState?.()?.cameras || [];
-    const match = cams.find((cam) => String(cam.id || '').toLowerCase() === query)
-      || cams.find((cam) => String(cam.name || '').toLowerCase() === query)
-      || cams.find((cam) => String(cam.name || '').toLowerCase().includes(query));
+    const match =
+      cams.find((cam) => String(cam.id || '').toLowerCase() === query) ||
+      cams.find((cam) => String(cam.name || '').toLowerCase() === query) ||
+      cams.find((cam) =>
+        String(cam.name || '')
+          .toLowerCase()
+          .includes(query),
+      );
     if (!match) {
-      return { ok: false, action: 'control_cctv', error: `No camera matched "${args.cameraQuery}"`, ...summarize() };
+      return {
+        ok: false,
+        action: 'control_cctv',
+        error: `No camera matched "${args.cameraQuery}"`,
+        ...summarize(),
+      };
     }
     styleManager?.supersedeDeferredNavigation?.();
     const selected = cctv.selectCamera(match.id);
@@ -1170,31 +1589,53 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
     const focusResult = activeId
       ? cctv.focusCamera(activeId)
       : CCTV_FOCUS_RESULT.NO_ACTIVE_CAMERA;
-    return { action: 'control_cctv', ...summarize(), ...cctvVoiceFocusOutcome(focusResult) };
+    return {
+      action: 'control_cctv',
+      ...summarize(),
+      ...cctvVoiceFocusOutcome(focusResult),
+    };
   }
   if (action === 'viewshed') {
     // Color-coded coverage volumes; enabled:false drops back to plain
     // coverage wireframes (not off — "hide coverage" is the coverage action).
-    const next = (typeof args.enabled === 'boolean' && !args.enabled) ? 'on' : 'viewshed';
-    dataManager.setLayerParams('cctv', { coverageMode: next }, { origin: 'voice' });
+    const next =
+      typeof args.enabled === 'boolean' && !args.enabled ? 'on' : 'viewshed';
+    dataManager.setLayerParams(
+      'cctv',
+      { coverageMode: next },
+      { origin: 'voice' },
+    );
     return { ok: true, action: 'control_cctv', ...summarize() };
   }
   if (action === 'adjust') {
     const current = summarize();
-    const next = typeof args.enabled === 'boolean' ? args.enabled : !current.calibrationMode;
-    dataManager.setLayerParams('cctv', { calibrationMode: next }, { origin: 'voice' });
+    const next =
+      typeof args.enabled === 'boolean'
+        ? args.enabled
+        : !current.calibrationMode;
+    dataManager.setLayerParams(
+      'cctv',
+      { calibrationMode: next },
+      { origin: 'voice' },
+    );
     return { ok: true, action: 'control_cctv', ...summarize() };
   }
   if (action === 'coverage') {
     const current = summarize();
-    const next = typeof args.enabled === 'boolean' ? args.enabled : !current.showCoverage;
-    dataManager.setLayerParams('cctv', { coverageMode: next ? 'on' : 'off' }, { origin: 'voice' });
+    const next =
+      typeof args.enabled === 'boolean' ? args.enabled : !current.showCoverage;
+    dataManager.setLayerParams(
+      'cctv',
+      { coverageMode: next ? 'on' : 'off' },
+      { origin: 'voice' },
+    );
     return { ok: true, action: 'control_cctv', ...summarize() };
   }
   if (action === 'projection' || action === 'autohop') {
     const key = action === 'projection' ? 'showProjection' : 'autoHop';
     const current = summarize();
-    const next = typeof args.enabled === 'boolean' ? args.enabled : !current[key];
+    const next =
+      typeof args.enabled === 'boolean' ? args.enabled : !current[key];
     dataManager.setLayerParams('cctv', { [key]: next }, { origin: 'voice' });
     return { ok: true, action: 'control_cctv', ...summarize() };
   }
@@ -1204,24 +1645,41 @@ export async function controlCctv(dataManager, args = {}, styleManager = null) {
 const RADIO_COUNTRY_CENTERS = new Map([
   ['us', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],
   ['usa', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],
-  ['united states', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],
-  ['united states of america', { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' }],
+  [
+    'united states',
+    { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' },
+  ],
+  [
+    'united states of america',
+    { lat: 39.8, lon: -98.6, country: 'US', label: 'United States' },
+  ],
 ]);
 
 /** Resolve curated cities and common country requests without moving the camera. */
 export function knownRadioLocation(query, locationId = '') {
-  const requestedId = normalizeLocationId(locationId) || normalizeLocationId(query);
+  const requestedId =
+    normalizeLocationId(locationId) || normalizeLocationId(query);
   const city = requestedId ? CITY_POIS[requestedId] : null;
   if (city) {
     const bounds = city.viewBounds;
     return {
-      lat: bounds ? (bounds.southwest.lat + bounds.northeast.lat) / 2 : city.pois[0]?.lat,
-      lon: bounds ? (bounds.southwest.lng + bounds.northeast.lng) / 2 : city.pois[0]?.lon,
+      lat: bounds
+        ? (bounds.southwest.lat + bounds.northeast.lat) / 2
+        : city.pois[0]?.lat,
+      lon: bounds
+        ? (bounds.southwest.lng + bounds.northeast.lng) / 2
+        : city.pois[0]?.lon,
       label: city.name,
       country: '',
     };
   }
-  return RADIO_COUNTRY_CENTERS.get(String(query || '').trim().toLowerCase()) || null;
+  return (
+    RADIO_COUNTRY_CENTERS.get(
+      String(query || '')
+        .trim()
+        .toLowerCase(),
+    ) || null
+  );
 }
 
 function radioCoordinatePair(args = {}) {
@@ -1230,22 +1688,25 @@ function radioCoordinatePair(args = {}) {
   const provided = latitudeProvided || longitudeProvided;
   const latitude = args.latitude;
   const longitude = args.longitude;
-  const valid = latitudeProvided
-    && longitudeProvided
-    && typeof latitude === 'number'
-    && typeof longitude === 'number'
-    && Number.isFinite(latitude)
-    && Number.isFinite(longitude)
-    && latitude >= -90
-    && latitude <= 90
-    && longitude >= -180
-    && longitude <= 180;
+  const valid =
+    latitudeProvided &&
+    longitudeProvided &&
+    typeof latitude === 'number' &&
+    typeof longitude === 'number' &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180;
   return { provided, valid, latitude, longitude };
 }
 
 function radioActionIsCurrent(options = {}) {
-  return !options.signal?.aborted
-    && (typeof options.isCurrent !== 'function' || options.isCurrent());
+  return (
+    !options.signal?.aborted &&
+    (typeof options.isCurrent !== 'function' || options.isCurrent())
+  );
 }
 
 function radioAbortError() {
@@ -1254,63 +1715,68 @@ function radioAbortError() {
   return error;
 }
 
-async function resolveRadioLocation(args = {}, coordinates = radioCoordinatePair(args), options = {}) {
+async function resolveRadioLocation(
+  args = {},
+  coordinates = radioCoordinatePair(args),
+  options = {},
+) {
   if (!radioActionIsCurrent(options)) throw radioAbortError();
   if (coordinates.valid) {
     const { latitude, longitude } = coordinates;
-    return { lat: latitude, lon: longitude, label: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`, country: '' };
+    return {
+      lat: latitude,
+      lon: longitude,
+      label: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
+      country: '',
+    };
   }
   const query = String(args.locationQuery || '').trim();
   const known = knownRadioLocation(query, args.locationId);
   if (known) return known;
   if (!query) return null;
-  const apiKey = window.__GOOGLE_MAPS_API_KEY__ || import.meta.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) throw new Error('No Google Maps API key available for Radio location search');
-  const controller = new AbortController();
-  const cancelFromTurn = () => controller.abort();
-  if (options.signal?.aborted) throw radioAbortError();
-  options.signal?.addEventListener('abort', cancelFromTurn, { once: true });
-  const timer = setTimeout(() => controller.abort(), 6000);
-  try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query)}&key=${apiKey}`;
-    const response = await fetch(url, { signal: controller.signal });
-    const body = await response.json();
-    if (!radioActionIsCurrent(options)) throw radioAbortError();
-    const result = body.status === 'OK' ? body.results?.[0] : null;
-    if (!result?.geometry?.location) return null;
-    return {
-      lat: result.geometry.location.lat,
-      lon: result.geometry.location.lng,
-      label: result.formatted_address || query,
-      country: '',
-    };
-  } finally {
-    clearTimeout(timer);
-    options.signal?.removeEventListener('abort', cancelFromTurn);
-  }
+  const { placeSearch = unavailablePlaceSearch, signal } = options;
+  const { place } = await placeSearch.geocode(query, { signal });
+  if (!radioActionIsCurrent(options)) throw radioAbortError();
+  if (!place) return null;
+  // Localized provider country labels must not become station country filters.
+  return {
+    lat: place.lat,
+    lon: place.lng,
+    label: place.label || query,
+    country: '',
+  };
 }
 
 /** Voice Radio controls over the Radio layer's public player surface. */
-export async function controlRadio(viewer, dataManager, args = {}, options = {}) {
-  const requestedAction = String(args.action || '').trim().toLowerCase();
+export async function controlRadio(
+  viewer,
+  dataManager,
+  args = {},
+  options = {},
+) {
+  const requestedAction = String(args.action || '')
+    .trim()
+    .toLowerCase();
   const coordinates = radioCoordinatePair(args);
   const hasSelectionCriteria = Boolean(
-    args.category
-    || args.locationId
-    || args.locationQuery
-    || coordinates.provided
-    || args.country
-    || args.stationQuery,
+    args.category ||
+    args.locationId ||
+    args.locationQuery ||
+    coordinates.provided ||
+    args.country ||
+    args.stationQuery,
   );
   // Realtime models can reasonably interpret "play news near Austin" as Play
   // plus qualifiers. Play cannot honor those qualifiers, so normalize that
   // equivalent tool shape to Select instead of silently choosing the current
   // viewport's nearest station.
-  const action = requestedAction === 'play' && hasSelectionCriteria
-    ? 'select'
-    : requestedAction;
+  const action =
+    requestedAction === 'play' && hasSelectionCriteria
+      ? 'select'
+      : requestedAction;
 
-  const readRadioLifecycle = () => readLayerLifecycleSummary(dataManager, 'radio');
+  const readRadioLifecycle = () =>
+    readLayerLifecycleSummary(dataManager, 'radio');
 
   const radio = dataManager.layers.get('radio')?.module;
   if (!radio) {
@@ -1325,13 +1791,16 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
   let lastIntentOutcome = null;
   let lastIntentError = null;
 
-  const intentSummary = () => (lastIntentOutcome ? {
-    phase: lastIntentOutcome.phase,
-    cancellationReason: lastIntentOutcome.cancellationReason || null,
-    successorIntentEpoch: lastIntentOutcome.successorIntentEpoch ?? null,
-    successorEnabled: lastIntentOutcome.successorEnabled ?? null,
-    successorOrigin: lastIntentOutcome.successorOrigin ?? null,
-  } : {});
+  const intentSummary = () =>
+    lastIntentOutcome
+      ? {
+          phase: lastIntentOutcome.phase,
+          cancellationReason: lastIntentOutcome.cancellationReason || null,
+          successorIntentEpoch: lastIntentOutcome.successorIntentEpoch ?? null,
+          successorEnabled: lastIntentOutcome.successorEnabled ?? null,
+          successorOrigin: lastIntentOutcome.successorOrigin ?? null,
+        }
+      : {};
 
   const cancelled = (summarize) => ({
     ok: false,
@@ -1344,9 +1813,11 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
 
   const radioLifecycleIsSettled = (shouldEnable) => {
     const lifecycle = readRadioLifecycle();
-    return lifecycle.enabled === shouldEnable
-      && lifecycle.lifecycleState === (shouldEnable ? 'enabled' : 'disabled')
-      && !lifecycle.lifecycleUncertain;
+    return (
+      lifecycle.enabled === shouldEnable &&
+      lifecycle.lifecycleState === (shouldEnable ? 'enabled' : 'disabled') &&
+      !lifecycle.lifecycleUncertain
+    );
   };
 
   const setRadioEnabled = async (shouldEnable) => {
@@ -1361,20 +1832,32 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     let result = false;
     try {
       if (typeof dataManager._setEnabledWithIntent === 'function') {
-        const intent = dataManager._setEnabledWithIntent('radio', shouldEnable, enableOptions);
+        const intent = dataManager._setEnabledWithIntent(
+          'radio',
+          shouldEnable,
+          enableOptions,
+        );
         result = await intent.promise;
         if (Number.isInteger(intent.intentEpoch)) {
-          lastIntentOutcome = await dataManager._waitForVisibilityIntent?.('radio', intent.intentEpoch);
+          lastIntentOutcome = await dataManager._waitForVisibilityIntent?.(
+            'radio',
+            intent.intentEpoch,
+          );
         }
       } else {
-        result = await dataManager.setEnabled('radio', shouldEnable, enableOptions);
+        result = await dataManager.setEnabled(
+          'radio',
+          shouldEnable,
+          enableOptions,
+        );
       }
     } catch (error) {
       lastIntentError = error;
       return false;
     }
     if (lastIntentOutcome?.succeeded === false) return false;
-    if (!radioActionIsCurrent(options) && lastIntentOutcome?.succeeded !== true) return false;
+    if (!radioActionIsCurrent(options) && lastIntentOutcome?.succeeded !== true)
+      return false;
     return result !== false && radioLifecycleIsSettled(shouldEnable);
   };
 
@@ -1391,11 +1874,12 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     const lifecycle = readRadioLifecycle();
     if (radioLifecycleIsSettled(true)) return true;
     if (
-      !enableIfOff
-      && !lifecycle.enabled
-      && lifecycle.lifecycleState === 'disabled'
-      && !lifecycle.lifecycleUncertain
-    ) return false;
+      !enableIfOff &&
+      !lifecycle.enabled &&
+      lifecycle.lifecycleState === 'disabled' &&
+      !lifecycle.lifecycleUncertain
+    )
+      return false;
     const reconciled = await setRadioEnabled(true);
     return reconciled && radioLifecycleIsSettled(true);
   };
@@ -1417,7 +1901,8 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     return {
       ok: false,
       action: 'control_radio',
-      error: 'Radio country must be a recognized code or country name (80 characters maximum)',
+      error:
+        'Radio country must be a recognized code or country name (80 characters maximum)',
       ...summarize(),
     };
   }
@@ -1426,7 +1911,8 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     return {
       ok: false,
       action: 'control_radio',
-      error: 'Radio coordinates require a complete numeric latitude/longitude pair in range',
+      error:
+        'Radio coordinates require a complete numeric latitude/longitude pair in range',
       ...summarize(),
     };
   }
@@ -1436,7 +1922,8 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
   if (action === 'enable' || action === 'disable') {
     const shouldEnable = action === 'enable';
     const changed = await setRadioEnabled(shouldEnable);
-    if (!radioActionIsCurrent(options) && lastIntentOutcome?.succeeded !== true) return cancelled(summarize);
+    if (!radioActionIsCurrent(options) && lastIntentOutcome?.succeeded !== true)
+      return cancelled(summarize);
     if (!changed) {
       return lifecycleFailure(
         `Radio could not be ${shouldEnable ? 'enabled' : 'disabled'}`,
@@ -1445,21 +1932,35 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     }
     return { ok: true, action: 'control_radio', ...summarize() };
   }
-  if (action === 'status') return { ok: true, action: 'control_radio', ...summarize() };
+  if (action === 'status')
+    return { ok: true, action: 'control_radio', ...summarize() };
   if (action === 'volume') {
     const volumePct = Number(args.volumePct);
     if (!Number.isFinite(volumePct) || volumePct < 0 || volumePct > 100) {
-      return { ok: false, action: 'control_radio', error: 'Radio volume must be from 0 to 100', ...summarize() };
+      return {
+        ok: false,
+        action: 'control_radio',
+        error: 'Radio volume must be from 0 to 100',
+        ...summarize(),
+      };
     }
     const authorized = await authorizeRadioPlayerMutation();
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
     if (!authorized) {
-      return lifecycleFailure('Radio must be fully enabled before changing volume', summarize);
+      return lifecycleFailure(
+        'Radio must be fully enabled before changing volume',
+        summarize,
+      );
     }
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
-    const volumeApplied = typeof dataManager.setLayerParams === 'function'
-      ? dataManager.setLayerParams('radio', { volume: volumePct / 100 }, { origin: 'voice' })
-      : radio.setVolume(volumePct / 100);
+    const volumeApplied =
+      typeof dataManager.setLayerParams === 'function'
+        ? dataManager.setLayerParams(
+            'radio',
+            { volume: volumePct / 100 },
+            { origin: 'voice' },
+          )
+        : radio.setVolume(volumePct / 100);
     if (volumeApplied === false) {
       return {
         ok: false,
@@ -1501,7 +2002,12 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     // the controller commits a successful Pause by aborting that older work.
     const lifecycle = readRadioLifecycle();
     if (!lifecycle.enabled && lifecycle.lifecycleState !== 'enabling') {
-      return { ok: true, action: 'control_radio', changed: false, ...summarize() };
+      return {
+        ok: true,
+        action: 'control_radio',
+        changed: false,
+        ...summarize(),
+      };
     }
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
     const paused = radio.pause?.({ origin: 'voice' }) || false;
@@ -1522,12 +2028,18 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
       // interrupted lookup from mutating layer or station state after barge-in.
       resolvedLocation = await resolveRadioLocation(args, coordinates, options);
     } catch (error) {
-      if (error?.name === 'AbortError' || !radioActionIsCurrent(options)) return cancelled(summarize);
+      if (error?.name === 'AbortError' || !radioActionIsCurrent(options))
+        return cancelled(summarize);
       throw error;
     }
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
     if ((args.locationQuery || args.locationId) && !resolvedLocation) {
-      return { ok: false, action: 'control_radio', error: `Could not resolve Radio location "${args.locationQuery || args.locationId}"`, ...summarize() };
+      return {
+        ok: false,
+        action: 'control_radio',
+        error: `Could not resolve Radio location "${args.locationQuery || args.locationId}"`,
+        ...summarize(),
+      };
     }
   }
   const authorized = await authorizeRadioPlayerMutation({ enableIfOff: true });
@@ -1538,7 +2050,12 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
   const state = radio.getUIState?.() || {};
   if (!radioActionIsCurrent(options)) return cancelled(summarize);
   if (!state.stationCount) {
-    return { ok: false, action: 'control_radio', error: state.error || 'No healthy Radio stations are available', ...summarize() };
+    return {
+      ok: false,
+      action: 'control_radio',
+      error: state.error || 'No healthy Radio stations are available',
+      ...summarize(),
+    };
   }
   if (action === 'play' || action === 'resume') {
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
@@ -1556,7 +2073,11 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
     if (args.category) {
       if (typeof dataManager.setLayerParams === 'function') {
-        dataManager.setLayerParams('radio', { filter: String(args.category) }, { origin: 'voice' });
+        dataManager.setLayerParams(
+          'radio',
+          { filter: String(args.category) },
+          { origin: 'voice' },
+        );
       } else {
         radio.setFilter(String(args.category));
       }
@@ -1575,16 +2096,24 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
   if (action === 'select') {
     const location = resolvedLocation;
     if (!radioActionIsCurrent(options)) return cancelled(summarize);
-    const station = radio.selectRequestedStation?.({
-      categoryId: String(args.category || 'all'),
-      anchor: location ? { lat: location.lat, lon: location.lon } : null,
-      country: normalizedCountry.empty
-        ? String(location?.country || '')
-        : normalizedCountry.code,
-      stationQuery: String(args.stationQuery || ''),
-    }, { autoplay: false });
+    const station = radio.selectRequestedStation?.(
+      {
+        categoryId: String(args.category || 'all'),
+        anchor: location ? { lat: location.lat, lon: location.lon } : null,
+        country: normalizedCountry.empty
+          ? String(location?.country || '')
+          : normalizedCountry.code,
+        stationQuery: String(args.stationQuery || ''),
+      },
+      { autoplay: false },
+    );
     if (!station) {
-      return { ok: false, action: 'control_radio', error: 'No Radio station matched that location and category', ...summarize() };
+      return {
+        ok: false,
+        action: 'control_radio',
+        error: 'No Radio station matched that location and category',
+        ...summarize(),
+      };
     }
     return {
       ok: true,
@@ -1604,7 +2133,10 @@ export async function controlRadio(viewer, dataManager, args = {}, options = {})
  * @param {boolean} [options.cameraSelected=false] Whether this action first selected a camera.
  * @returns {{ok: boolean, error: string|null}} Voice-facing result fields.
  */
-export function cctvVoiceFocusOutcome(focusResult, { cameraSelected = false } = {}) {
+export function cctvVoiceFocusOutcome(
+  focusResult,
+  { cameraSelected = false } = {},
+) {
   if (focusResult === CCTV_FOCUS_RESULT.FOCUSED || focusResult === true) {
     return { ok: true, error: null };
   }
@@ -1641,48 +2173,97 @@ export function cctvVoiceFocusOutcome(focusResult, { cameraSelected = false } = 
  */
 export function formatTrackedEntityLabel(found, query = '') {
   const text = (v) => String(v ?? '').trim();
-  return text(found?.callsign)
-    || text(found?.registration)
-    || text(found?.name)
-    || text(found?.icao24)
-    || text(found?.mmsi)
-    || text(found?.noradId)
-    || String(query);
+  return (
+    text(found?.callsign) ||
+    text(found?.registration) ||
+    text(found?.name) ||
+    text(found?.icao24) ||
+    text(found?.mmsi) ||
+    text(found?.noradId) ||
+    String(query)
+  );
 }
 
 /** Finds and tracks/selects an entity by spoken query across layer families. */
-async function trackEntity(viewer, dataManager, styleManager, args = {}) {
+async function trackEntity(
+  viewer,
+  dataManager,
+  styleManager,
+  args = {},
+  { isCurrent = () => true } = {},
+) {
+  const cancelled = () => ({
+    ok: false,
+    cancelled: true,
+    action: 'track_entity',
+    error: 'Tracking request was superseded by a newer voice turn',
+  });
+  if (!isCurrent()) return cancelled();
   const query = String(args.query || '').trim();
   if (!query) throw new Error('track_entity needs a query');
 
   // Fire queries route to the FIRMS layer's strongest detection
   if (/\bfires?\b/i.test(query)) {
     if (!dataManager.isEnabled('local-firms')) {
-      return { ok: false, action: 'track_entity', query, error: 'The FIRMS fires layer is not enabled' };
+      return {
+        ok: false,
+        action: 'track_entity',
+        query,
+        error: 'The FIRMS fires layer is not enabled',
+      };
     }
     const firms = dataManager.layers.get('local-firms')?.module;
     const strongest = firms?.getStrongestFire?.();
     if (!strongest) {
-      return { ok: false, action: 'track_entity', query, error: 'No fire detections loaded yet' };
-    }
-    if (!Number.isFinite(strongest.latitude) || !Number.isFinite(strongest.longitude)) {
-      return { ok: false, action: 'track_entity', query, error: 'The strongest fire has no usable position' };
-    }
-    return runManagedVoiceNavigation(styleManager, 'fire', 'track_entity', () => {
-      flyToLandmark(viewer, strongest.latitude, strongest.longitude, {
-        range: 14000, pitch: -50, heading: 0, buildingHeight: 0, duration: 2.2,
-      });
       return {
-        ok: true, action: 'track_entity', kind: 'fire', layerId: 'local-firms',
-        label: strongest.label || 'Strongest fire',
-        latitude: strongest.latitude, longitude: strongest.longitude,
-        frp: strongest.frp ?? null,
+        ok: false,
+        action: 'track_entity',
+        query,
+        error: 'No fire detections loaded yet',
       };
-    });
+    }
+    if (
+      !Number.isFinite(strongest.latitude) ||
+      !Number.isFinite(strongest.longitude)
+    ) {
+      return {
+        ok: false,
+        action: 'track_entity',
+        query,
+        error: 'The strongest fire has no usable position',
+      };
+    }
+    if (!isCurrent()) return cancelled();
+    return runManagedVoiceNavigation(
+      styleManager,
+      'fire',
+      'track_entity',
+      () => {
+        flyToLandmark(viewer, strongest.latitude, strongest.longitude, {
+          range: 14000,
+          pitch: -50,
+          heading: 0,
+          buildingHeight: 0,
+          duration: 2.2,
+        });
+        return {
+          ok: true,
+          action: 'track_entity',
+          kind: 'fire',
+          layerId: 'local-firms',
+          label: strongest.label || 'Strongest fire',
+          latitude: strongest.latitude,
+          longitude: strongest.longitude,
+          frp: strongest.frp ?? null,
+        };
+      },
+    );
   }
 
   const requested = args.layerId ? normalizeLayerId(args.layerId) : null;
-  const families = TRACKABLE_FAMILIES.filter((family) => !requested || family.layerId === requested);
+  const families = TRACKABLE_FAMILIES.filter(
+    (family) => !requested || family.layerId === requested,
+  );
   const skippedDisabled = [];
 
   for (const family of families) {
@@ -1695,47 +2276,72 @@ async function trackEntity(viewer, dataManager, styleManager, args = {}) {
     const found = module.findByQuery(query);
     if (!found) continue;
 
-    if (family.kind === 'vessel'
-      && (!Number.isFinite(found.latitude) || !Number.isFinite(found.longitude))) {
+    if (!isCurrent()) return cancelled();
+
+    if (
+      family.kind === 'vessel' &&
+      (!Number.isFinite(found.latitude) || !Number.isFinite(found.longitude))
+    ) {
       return {
-        ok: false, action: 'track_entity', layerId: family.layerId, kind: family.kind,
+        ok: false,
+        action: 'track_entity',
+        layerId: family.layerId,
+        kind: family.kind,
         error: 'The matched vessel has no usable position',
       };
     }
 
-    return runManagedVoiceNavigation(styleManager, family.kind, 'track_entity', () => {
-      let trackedOk = false;
-      if (family.kind === 'vessel') {
-        trackedOk = !!module.selectById?.(found.mmsi);
-        flyToLandmark(viewer, found.latitude, found.longitude, {
-          range: 6000, pitch: -45, heading: 0, buildingHeight: 0, duration: 2.0,
-        });
-      } else if (family.kind === 'satellite') {
-        trackedOk = !!module.trackById?.(found.noradId, { origin: 'voice' });
-      } else {
-        trackedOk = !!module.trackById?.(found.icao24, { origin: 'voice' });
-      }
+    return runManagedVoiceNavigation(
+      styleManager,
+      family.kind,
+      'track_entity',
+      () => {
+        let trackedOk = false;
+        if (family.kind === 'vessel') {
+          trackedOk = !!module.selectById?.(found.mmsi);
+          flyToLandmark(viewer, found.latitude, found.longitude, {
+            range: 6000,
+            pitch: -45,
+            heading: 0,
+            buildingHeight: 0,
+            duration: 2.0,
+          });
+        } else if (family.kind === 'satellite') {
+          trackedOk = !!module.trackById?.(found.noradId, { origin: 'voice' });
+        } else {
+          trackedOk = !!module.trackById?.(found.icao24, { origin: 'voice' });
+        }
 
-      return {
-        ok: trackedOk,
-        action: 'track_entity',
-        layerId: family.layerId,
-        kind: family.kind,
-        // Aircraft follow the flight layers' label convention (callsign →
-        // registration → icao24) so the spoken name matches what the UI shows;
-        // `registration` is absent on vessels/satellites and simply falls
-        // through to their own name/id links.
-        label: formatTrackedEntityLabel(found, query),
-        latitude: found.latitude ?? null,
-        longitude: found.longitude ?? null,
-        altitudeM: Number.isFinite(found.altitudeM) ? Math.round(found.altitudeM) : null,
-        error: trackedOk ? null : 'Match found but tracking failed',
-      };
-    });
+        return {
+          ok: trackedOk,
+          action: 'track_entity',
+          layerId: family.layerId,
+          kind: family.kind,
+          // Aircraft follow the flight layers' label convention (callsign →
+          // registration → icao24) so the spoken name matches what the UI shows;
+          // `registration` is absent on vessels/satellites and simply falls
+          // through to their own name/id links.
+          label: formatTrackedEntityLabel(found, query),
+          latitude: found.latitude ?? null,
+          longitude: found.longitude ?? null,
+          altitudeM: Number.isFinite(found.altitudeM)
+            ? Math.round(found.altitudeM)
+            : null,
+          error: trackedOk ? null : 'Match found but tracking failed',
+        };
+      },
+    );
   }
 
-  const disabledNote = skippedDisabled.length ? ` (disabled layers skipped: ${skippedDisabled.join(', ')})` : '';
-  return { ok: false, action: 'track_entity', query, error: `Nothing matched "${query}"${disabledNote}` };
+  const disabledNote = skippedDisabled.length
+    ? ` (disabled layers skipped: ${skippedDisabled.join(', ')})`
+    : '';
+  return {
+    ok: false,
+    action: 'track_entity',
+    query,
+    error: `Nothing matched "${query}"${disabledNote}`,
+  };
 }
 
 /** Releases tracking/selection on every entity layer family. */
@@ -1748,14 +2354,20 @@ function stopAllTracking(viewer, dataManager) {
     try {
       if (family.kind === 'vessel') {
         if (module.getSelectedInfo?.()) {
-          if (typeof module.clearSelection !== 'function' || module.clearSelection() === false) {
+          if (
+            typeof module.clearSelection !== 'function' ||
+            module.clearSelection() === false
+          ) {
             failed.add(family.layerId);
           } else {
             released.push(family.layerId);
           }
         }
       } else if (module.getTrackedInfo?.()) {
-        if (typeof module.stopTracking !== 'function' || module.stopTracking({ origin: 'voice' }) === false) {
+        if (
+          typeof module.stopTracking !== 'function' ||
+          module.stopTracking({ origin: 'voice' }) === false
+        ) {
           failed.add(family.layerId);
         } else {
           released.push(family.layerId);
@@ -1771,7 +2383,13 @@ function stopAllTracking(viewer, dataManager) {
     ['satellites', 'selectedSatTrackingId'],
   ]) {
     try {
-      if (dataManager.setLayerParams(layerId, { [key]: null }, { origin: 'voice' }) === false) {
+      if (
+        dataManager.setLayerParams(
+          layerId,
+          { [key]: null },
+          { origin: 'voice' },
+        ) === false
+      ) {
         failed.add(layerId);
       }
     } catch {
@@ -1801,16 +2419,30 @@ function stopAllTracking(viewer, dataManager) {
  */
 async function frameOverhead(viewer, dataManager, styleManager, args = {}) {
   const targetRaw = String(args.target || 'flights').toLowerCase();
-  const layerId = FRAME_TARGETS.get(targetRaw) || normalizeLayerId(targetRaw) || 'flights';
+  const layerId =
+    FRAME_TARGETS.get(targetRaw) || normalizeLayerId(targetRaw) || 'flights';
   if (!dataManager.layers.has(layerId)) {
-    return { ok: false, action: 'frame_overhead', error: `Unknown target layer: ${args.target}` };
+    return {
+      ok: false,
+      action: 'frame_overhead',
+      error: `Unknown target layer: ${args.target}`,
+    };
   }
   if (!dataManager.isEnabled(layerId)) {
-    return { ok: false, action: 'frame_overhead', layerId, error: `The ${layerId} layer is not enabled` };
+    return {
+      ok: false,
+      action: 'frame_overhead',
+      layerId,
+      error: `The ${layerId} layer is not enabled`,
+    };
   }
   const module = dataManager.layers.get(layerId)?.module;
   const isSatellites = layerId === 'satellites';
-  const defaultRadiusKm = isSatellites ? 3000 : (layerId === 'ais-live-vessels' ? 120 : 150);
+  const defaultRadiusKm = isSatellites
+    ? 3000
+    : layerId === 'ais-live-vessels'
+      ? 120
+      : 150;
   const radiusKm = clampNumber(args.radiusKm, 10, 20000, defaultRadiusKm);
   const center = getViewTargetCartesian(viewer) || viewer.camera.positionWC;
 
@@ -1820,63 +2452,98 @@ async function frameOverhead(viewer, dataManager, styleManager, args = {}) {
   } else if (typeof module.getAllPositions === 'function') {
     entries = (module.getAllPositions(800) || [])
       .filter((entry) => entry.position)
-      .map((entry) => ({ ...entry, distance: Cesium.Cartesian3.distance(center, entry.position) }))
+      .map((entry) => ({
+        ...entry,
+        distance: Cesium.Cartesian3.distance(center, entry.position),
+      }))
       .filter((entry) => entry.distance <= radiusKm * 1000)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 80);
   }
   if (!entries.length) {
     return {
-      ok: false, action: 'frame_overhead', layerId, radiusKm: Math.round(radiusKm), count: 0,
+      ok: false,
+      action: 'frame_overhead',
+      layerId,
+      radiusKm: Math.round(radiusKm),
+      count: 0,
       error: `No ${targetRaw} within ${Math.round(radiusKm)} km of the current view`,
     };
   }
 
-  const sphere = Cesium.BoundingSphere.fromPoints(entries.map((entry) => entry.position));
+  const sphere = Cesium.BoundingSphere.fromPoints(
+    entries.map((entry) => entry.position),
+  );
   sphere.radius = Math.max(sphere.radius * 1.25, 8000);
   const pitch = Cesium.Math.toRadians(isSatellites ? -35 : -62);
-  return runManagedVoiceNavigation(styleManager, 'frame', 'frame_overhead', () => {
-    viewer.camera.flyToBoundingSphere(sphere, {
-      duration: 2.0,
-      offset: new Cesium.HeadingPitchRange(viewer.camera.heading, pitch, sphere.radius * 2.4),
-    });
+  return runManagedVoiceNavigation(
+    styleManager,
+    'frame',
+    'frame_overhead',
+    () => {
+      viewer.camera.flyToBoundingSphere(sphere, {
+        duration: 2.0,
+        offset: new Cesium.HeadingPitchRange(
+          viewer.camera.heading,
+          pitch,
+          sphere.radius * 2.4,
+        ),
+      });
 
-    let detectionEnabled = false;
-    try {
-      const detectionState = styleManager?.getDetectionState?.();
-      if (detectionState?.detectionMode === 'OFF') {
-        const detectionResult = styleManager.setDetection({ mode: 'dense' });
-        detectionEnabled = detectionResult?.ok === true;
-      } else if (detectionState) {
-        detectionEnabled = true;
+      let detectionEnabled = false;
+      try {
+        const detectionState = styleManager?.getDetectionState?.();
+        if (detectionState?.detectionMode === 'OFF') {
+          const detectionResult = styleManager.setDetection({ mode: 'dense' });
+          detectionEnabled = detectionResult?.ok === true;
+        } else if (detectionState) {
+          detectionEnabled = true;
+        }
+      } catch {
+        // detection facade unavailable; framing still succeeded
       }
-    } catch {
-      // detection facade unavailable; framing still succeeded
-    }
 
-    return {
-      ok: true,
-      action: 'frame_overhead',
-      layerId,
-      radiusKm: Math.round(radiusKm),
-      count: entries.length,
-      detectionEnabled,
-      nearest: entries.slice(0, 5).map((entry) => ({
-        id: entry.id || entry.icao24 || entry.mmsi || null,
-        label: entry.label || entry.callsign || entry.name || null,
-      })),
-    };
-  });
+      return {
+        ok: true,
+        action: 'frame_overhead',
+        layerId,
+        radiusKm: Math.round(radiusKm),
+        count: entries.length,
+        detectionEnabled,
+        nearest: entries.slice(0, 5).map((entry) => ({
+          id: entry.id || entry.icao24 || entry.mmsi || null,
+          // Canonical identity: `id` is a display label for aircraft.
+          ...(entry.icao24 ? { icao24: String(entry.icao24) } : {}),
+          ...(entry.mmsi ? { mmsi: String(entry.mmsi) } : {}),
+          label: entry.label || entry.callsign || entry.name || null,
+        })),
+      };
+    },
+  );
 }
 
 /** Run one validated voice camera mutation through the UI-owned authority seam. */
-function runManagedVoiceNavigation(styleManager, noun, action, navigate, releaseOptions = undefined) {
+function runManagedVoiceNavigation(
+  styleManager,
+  noun,
+  action,
+  navigate,
+  releaseOptions = undefined,
+) {
   if (typeof styleManager?.runImmediateNavigation !== 'function') {
     return { ok: false, action, error: 'Camera navigation policy unavailable' };
   }
-  const result = styleManager.runImmediateNavigation(noun, navigate, releaseOptions);
+  const result = styleManager.runImmediateNavigation(
+    noun,
+    navigate,
+    releaseOptions,
+  );
   if (result !== false) return result;
-  return { ok: false, action, error: 'Camera navigation is unavailable in the current view' };
+  return {
+    ok: false,
+    action,
+    error: 'Camera navigation is unavailable in the current view',
+  };
 }
 
 /** Gathers tracked/selected entities across layer families for read-back. */
@@ -1886,8 +2553,12 @@ function collectTrackedEntities(dataManager) {
     const module = dataManager.layers.get(family.layerId)?.module;
     if (!module) continue;
     try {
-      const info = family.kind === 'vessel' ? module.getSelectedInfo?.() : module.getTrackedInfo?.();
-      if (info) tracked.push({ kind: family.kind, layerId: family.layerId, ...info });
+      const info =
+        family.kind === 'vessel'
+          ? module.getSelectedInfo?.()
+          : module.getTrackedInfo?.();
+      if (info)
+        tracked.push({ kind: family.kind, layerId: family.layerId, ...info });
     } catch {
       // layer not ready
     }
@@ -1895,7 +2566,12 @@ function collectTrackedEntities(dataManager) {
   return tracked;
 }
 
-export async function getBasemapLabelContext(viewer) {
+export async function getBasemapLabelContext(
+  viewer,
+  service = defaultGeospatial,
+  { cachedOnly = false } = {},
+) {
+  const { reverseGeocodeCache, nearbyPlacesCache } = cachesFor(service);
   const samples = sampleViewportCartographics(viewer);
   const cameraHeightM = viewer.camera.positionCartographic.height;
   const target = getViewTargetCartographic(viewer);
@@ -1909,18 +2585,40 @@ export async function getBasemapLabelContext(viewer) {
 
   const latitude = Number(Cesium.Math.toDegrees(target.latitude).toFixed(6));
   const longitude = Number(Cesium.Math.toDegrees(target.longitude).toFixed(6));
-  const cachedViewportPlaces = viewportPlacesFromCache(samples, cameraHeightM);
+  const cachedViewportPlaces = viewportPlacesFromCache(
+    samples,
+    cameraHeightM,
+    service,
+  );
   const viewportPromise = cachedViewportPlaces
     ? Promise.resolve(cachedViewportPlaces)
-    : reverseGeocodeViewportSamples(samples, cameraHeightM);
+    : cachedOnly
+      ? Promise.resolve(null)
+      : reverseGeocodeViewportSamples(samples, cameraHeightM, service);
   const placePromise = shouldReverseGeocode(cameraHeightM)
-    ? reverseGeocode(latitude, longitude)
+    ? cachedOnly
+      ? Promise.resolve(
+          reverseGeocodeCache.get(
+            reverseGeocodeKey(latitude, longitude, service),
+          ) || null,
+        )
+      : reverseGeocode(latitude, longitude, service)
     : Promise.resolve(null);
   const nearbyPromise = shouldFetchNearbyPlaces(cameraHeightM)
-    ? fetchNearbyPlaces(latitude, longitude, cameraHeightM)
+    ? cachedOnly
+      ? Promise.resolve(
+          nearbyPlacesCache.get(
+            nearbyPlacesCacheKey(latitude, longitude, cameraHeightM, service),
+          ) || [],
+        )
+      : fetchNearbyPlaces(latitude, longitude, cameraHeightM, service)
     : Promise.resolve([]);
   const [viewportPlaces, place, nearbyPlaces] = await Promise.all([
-    resolveWithin(viewportPromise, BASEMAP_CONTEXT_WAIT_MS, cachedViewportPlaces),
+    resolveWithin(
+      viewportPromise,
+      BASEMAP_CONTEXT_WAIT_MS,
+      cachedViewportPlaces,
+    ),
     resolveWithin(placePromise, BASEMAP_CONTEXT_WAIT_MS, null),
     resolveWithin(nearbyPromise, BASEMAP_CONTEXT_WAIT_MS, []),
   ]);
@@ -1938,10 +2636,12 @@ export async function getBasemapLabelContext(viewer) {
       ...(place?.streetLabels || []),
       ...(viewportPlaces?.streetLabels || []),
     ]).slice(0, 16),
-    nearbyPlaceLabels: uniqueStrings((nearbyPlaces || []).flatMap((nearbyPlace) => [
-      nearbyPlace.name,
-      nearbyPlace.address,
-    ])).slice(0, 24),
+    nearbyPlaceLabels: uniqueStrings(
+      (nearbyPlaces || []).flatMap((nearbyPlace) => [
+        nearbyPlace.name,
+        nearbyPlace.address,
+      ]),
+    ).slice(0, 24),
   };
 }
 
@@ -1965,7 +2665,10 @@ function installViewTargetPrewarm(viewer) {
         } catch (error) {
           if (reportedPrewarmFailure) return;
           reportedPrewarmFailure = true;
-          console.debug('[Voice] view-target prewarm skipped:', error?.message || error);
+          console.debug(
+            '[Voice] view-target prewarm skipped:',
+            error?.message || error,
+          );
         }
       };
       if (typeof window.requestIdleCallback === 'function') {
@@ -2005,7 +2708,10 @@ function adjustCameraZoom(viewer, args) {
   if (direction === 'out') {
     camera.zoomOut(movementM);
   } else {
-    const safeMovementM = Math.min(movementM, Math.max(0, targetDistanceM - 25));
+    const safeMovementM = Math.min(
+      movementM,
+      Math.max(0, targetDistanceM - 25),
+    );
     if (safeMovementM <= 0) {
       return {
         ok: false,
@@ -2036,13 +2742,30 @@ function adjustCameraZoom(viewer, args) {
   };
 }
 
-const COMPASS_16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const COMPASS_16 = [
+  'N',
+  'NNE',
+  'NE',
+  'ENE',
+  'E',
+  'ESE',
+  'SE',
+  'SSE',
+  'S',
+  'SSW',
+  'SW',
+  'WSW',
+  'W',
+  'WNW',
+  'NW',
+  'NNW',
+];
 
 function compassDir(azDeg) {
-  return COMPASS_16[Math.round(((((azDeg % 360) + 360) % 360)) / 22.5) % 16];
+  return COMPASS_16[Math.round((((azDeg % 360) + 360) % 360) / 22.5) % 16];
 }
 
-function nextIssPass(viewer, args) {
+function nextIssPass(viewer, dataManager, args) {
   let latDeg = Number.isFinite(args.latitude) ? args.latitude : null;
   let lonDeg = Number.isFinite(args.longitude) ? args.longitude : null;
   if (latDeg == null || lonDeg == null) {
@@ -2051,13 +2774,20 @@ function nextIssPass(viewer, args) {
     latDeg = Cesium.Math.toDegrees(carto.latitude);
     lonDeg = Cesium.Math.toDegrees(carto.longitude);
   }
-  const minElevDeg = Number.isFinite(args.minElevationDeg) ? args.minElevationDeg : 10;
-  const result = getNextIssPass({ latDeg, lonDeg, minElevDeg });
+  const minElevDeg = Number.isFinite(args.minElevationDeg)
+    ? args.minElevationDeg
+    : 10;
+  const result = dataManager?.layers
+    ?.get('satellites')
+    ?.module?.getNextIssPass?.({ latDeg, lonDeg, minElevDeg }) ?? {
+    status: 'no-tle',
+  };
   if (result.status === 'no-tle') {
     return {
       ok: false,
       action: 'next_iss_pass',
-      error: 'ISS orbital elements not loaded yet — enable the satellites layer once, then ask again.',
+      error:
+        'ISS orbital elements not loaded yet — enable the satellites layer once, then ask again.',
     };
   }
   if (result.status === 'none') {
@@ -2077,6 +2807,64 @@ function nextIssPass(viewer, args) {
     durationMin: Math.max(1, Math.round((pass.setMs - pass.riseMs) / 60000)),
     peakElevationDeg: Math.round(pass.maxElevDeg),
     riseDirection: compassDir(pass.riseAzDeg),
+    visible: typeof pass.visible === 'boolean' ? pass.visible : null,
+    visibilityNote:
+      'Geometric illumination estimate only; weather, brightness and orbital-element age affect actual visibility.',
+    setIso: new Date(pass.setMs).toISOString(),
+    peakIso: new Date(pass.maxElevMs).toISOString(),
+  };
+}
+
+function nextSatellitePass(viewer, dataManager, args) {
+  const layer = dataManager?.layers?.get('satellites')?.module;
+  const identity = layer?.resolveSatelliteForPass?.(args.target) || {
+    status: 'not-found',
+  };
+  if (identity.status !== 'ok')
+    return {
+      ok: false,
+      action: 'next_satellite_pass',
+      ...identity,
+      error:
+        identity.status === 'ambiguous'
+          ? 'Several loaded satellites match. Choose a NORAD ID from candidates.'
+          : 'No loaded satellite matches. Enable satellites and use an exact name or NORAD ID.',
+    };
+  // Reuse the legacy location fallback and result formatting, substituting only
+  // this explicitly resolved catalog identity and the optional visibility filter.
+  const adapter = {
+    layers: new Map([
+      [
+        'satellites',
+        {
+          module: {
+            getNextIssPass: (options) =>
+              layer.getNextSatellitePass(identity.noradId, {
+                ...options,
+                requireVisible: args.visibleOnly === true,
+              }),
+          },
+        },
+      ],
+    ]),
+  };
+  const result = nextIssPass(viewer, adapter, args);
+  if (result.error) {
+    result.error = result.error.replace(
+      /ISS/g,
+      identity.name || String(identity.noradId),
+    );
+    if (args.visibleOnly === true)
+      result.error +=
+        ' Search required estimated illumination under a dark sky.';
+  }
+  return {
+    ...result,
+    action: 'next_satellite_pass',
+    noradId: identity.noradId,
+    name: identity.name,
+    visibleOnly: args.visibleOnly === true,
+    horizonHours: 24,
   };
 }
 
@@ -2090,7 +2878,8 @@ function normalizePanelId(value) {
 function normalizeLayerId(value) {
   const raw = String(value || '').trim();
   if (!raw) return null;
-  if (LAYER_ALIASES.has(raw.toLowerCase())) return LAYER_ALIASES.get(raw.toLowerCase());
+  if (LAYER_ALIASES.has(raw.toLowerCase()))
+    return LAYER_ALIASES.get(raw.toLowerCase());
   return raw;
 }
 
@@ -2101,20 +2890,28 @@ function normalizeCockpitTargetLayer(value) {
 }
 
 function normalizeCockpitNavigationHints(rawAction) {
-  const raw = String(rawAction || '').trim().toLowerCase();
+  const raw = String(rawAction || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return {};
 
-  const targetLayer = raw.includes('vessel') || raw.includes('ship') || raw.includes('ais')
-    ? 'ais-live-vessels'
-    : raw.includes('installation') || raw.includes('facility') || raw.includes('base')
-      ? 'military-installations'
-      : raw.includes('military')
-        ? 'military'
-        : null;
+  const targetLayer =
+    raw.includes('vessel') || raw.includes('ship') || raw.includes('ais')
+      ? 'ais-live-vessels'
+      : raw.includes('installation') ||
+          raw.includes('facility') ||
+          raw.includes('base')
+        ? 'military-installations'
+        : raw.includes('military')
+          ? 'military'
+          : null;
 
-  const aircraftClass = raw.includes('helicopter') || raw.includes('helo') || raw.includes('chopper')
-    ? 'helicopter'
-    : null;
+  const aircraftClass =
+    raw.includes('helicopter') ||
+    raw.includes('helo') ||
+    raw.includes('chopper')
+      ? 'helicopter'
+      : null;
 
   return {
     targetLayer,
@@ -2140,7 +2937,9 @@ function normalizeCockpitNavigationHints(rawAction) {
  * @returns {string|null} Class id, or null when nothing was supplied.
  */
 function normalizeAircraftClassFilter(value) {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return null;
   return raw.replace(/[\s-]+/g, '') === TR3B_CLASS ? TR3B_CLASS : raw;
 }
@@ -2155,13 +2954,17 @@ function setPanelOpen(styleManager, panelId, open) {
 }
 
 function normalizeContextMode(value) {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return null;
   return CONTEXT_MODE_ALIASES.get(raw) || null;
 }
 
 function normalizeCockpitAction(value) {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return null;
 
   const direct = COCKPIT_ACTION_ALIASES.get(raw);
@@ -2178,13 +2981,16 @@ function normalizeCockpitAction(value) {
   if (/\bstatus\b|\bstate\b/.test(normalized)) return 'status';
   if (/\bexit\b|\bleave\b|\bquit\b/.test(normalized)) return 'exit';
   if (/\benter\b|\bopen\b|\bstart\b/.test(normalized)) return 'enter';
-  if (/\bnext\b|\bclosest\b|\bnearby\b|\bnearest\b/.test(normalized)) return 'next';
+  if (/\bnext\b|\bclosest\b|\bnearby\b|\bnearest\b/.test(normalized))
+    return 'next';
 
   return null;
 }
 
 function focusDataLayerRow(layerId) {
-  const row = document.querySelector(`#data-toggles [data-layer-id="${CSS.escape(layerId)}"]`);
+  const row = document.querySelector(
+    `#data-toggles [data-layer-id="${CSS.escape(layerId)}"]`,
+  );
   if (!row) return null;
   row.scrollIntoView({ block: 'center', behavior: 'smooth' });
   row.classList.remove('gev-voice-focus');
@@ -2195,30 +3001,39 @@ function focusDataLayerRow(layerId) {
   return { id: layerId, name };
 }
 
-
 function normalizeStyle(value) {
-  const raw = String(value || '').trim().toLowerCase();
-  if (raw === 'filter off' || raw === 'off' || raw === 'default') return 'normal';
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (raw === 'filter off' || raw === 'off' || raw === 'default')
+    return 'normal';
   if (raw === 'night vision' || raw === 'nvg') return 'surveillance';
   if (raw === 'flir') return 'thermal';
   if (ALLOWED_STYLES.has(raw)) return raw;
   return null;
 }
 
-async function flyToRequestedLocation(viewer, args, {
-  onStart = null,
-  runImmediate = null,
-  beginDeferred = null,
-  reassertDeferred = null,
-} = {}) {
+async function flyToRequestedLocation(
+  viewer,
+  args,
+  {
+    placeSearch = unavailablePlaceSearch,
+    searchNavigation = searchAndFlyTo,
+    signal,
+    onProgress = () => {},
+    onStart = null,
+    runImmediate = null,
+    beginDeferred = null,
+    reassertDeferred = null,
+  } = {},
+) {
   const requestedRangeM = Number(args.rangeM);
   const rangeM = Number.isFinite(requestedRangeM)
     ? clampNumber(requestedRangeM, 100, 20000000, 900)
     : null;
   const locationId = normalizeLocationId(args.locationId || args.query);
-  const immediate = (navigate) => (
-    typeof runImmediate === 'function' ? runImmediate(navigate) : navigate()
-  );
+  const immediate = (navigate) =>
+    typeof runImmediate === 'function' ? runImmediate(navigate) : navigate();
   const immediateOnStart = typeof runImmediate === 'function' ? null : onStart;
   const cancelled = (label) => ({
     ok: false,
@@ -2227,15 +3042,21 @@ async function flyToRequestedLocation(viewer, args, {
     label,
   });
   let settleArrival = null;
-  const arrival = args.waitForArrival === true
-    ? new Promise((resolve) => { settleArrival = resolve; })
-    : null;
-  const arrivalHooks = arrival ? {
-    onComplete: () => settleArrival?.('arrived'),
-    onCancel: () => settleArrival?.('cancelled'),
-  } : {};
+  const arrival =
+    args.waitForArrival === true
+      ? new Promise((resolve) => {
+          settleArrival = resolve;
+        })
+      : null;
+  const arrivalHooks = arrival
+    ? {
+        onComplete: () => settleArrival?.('arrived'),
+        onCancel: () => settleArrival?.('cancelled'),
+      }
+    : {};
   const afterArrival = async (result, label) => {
     if (!arrival || result?.ok !== true) return result;
+    onProgress('fly', label);
     const status = await arrival;
     settleArrival = null;
     return status === 'arrived'
@@ -2244,24 +3065,29 @@ async function flyToRequestedLocation(viewer, args, {
   };
 
   if (locationId) {
-    const result = immediate(() => flyToPresetLocation(viewer, locationId, {
-      ...(rangeM || args.viewMode === 'close'
-        ? { range: rangeM || 250 }
-        : { viewMode: 'overview' }),
-      duration: 2.2,
-      onStart: immediateOnStart,
-      ...arrivalHooks,
-    }));
-    if (result === false) return cancelled(CITY_POIS[locationId]?.name || locationId);
+    const result = immediate(() =>
+      flyToPresetLocation(viewer, locationId, {
+        ...(rangeM || args.viewMode === 'close'
+          ? { range: rangeM || 250 }
+          : { viewMode: 'overview' }),
+        duration: 2.2,
+        onStart: immediateOnStart,
+        ...arrivalHooks,
+      }),
+    );
+    if (result === false)
+      return cancelled(CITY_POIS[locationId]?.name || locationId);
     const response = {
       ok: Boolean(result),
       action: 'fly_to_location',
       locationId,
       label: CITY_POIS[locationId]?.name || locationId,
-      rangeM: result?.range ? Math.round(result.range) : (rangeM || null),
+      rangeM: result?.range ? Math.round(result.range) : rangeM || null,
       navigationMode: rangeM
         ? 'explicit-range'
-        : (args.viewMode === 'close' ? 'city-close' : (result?.navigationMode || 'city-overview')),
+        : args.viewMode === 'close'
+          ? 'city-close'
+          : result?.navigationMode || 'city-overview',
     };
     return afterArrival(response, response.label);
   }
@@ -2269,16 +3095,19 @@ async function flyToRequestedLocation(viewer, args, {
   const latitude = Number(args.latitude);
   const longitude = Number(args.longitude);
   if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-    const result = immediate(() => flyToLandmark(viewer, latitude, longitude, {
-      range: rangeM || 250,
-      pitch: -35,
-      heading: 0,
-      buildingHeight: 0,
-      duration: 2.2,
-      onStart: immediateOnStart,
-      ...arrivalHooks,
-    }));
-    if (result === false) return cancelled(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+    const result = immediate(() =>
+      flyToLandmark(viewer, latitude, longitude, {
+        range: rangeM || 250,
+        pitch: -35,
+        heading: 0,
+        buildingHeight: 0,
+        duration: 2.2,
+        onStart: immediateOnStart,
+        ...arrivalHooks,
+      }),
+    );
+    if (result === false)
+      return cancelled(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
     const response = {
       ok: true,
       action: 'fly_to_location',
@@ -2298,12 +3127,14 @@ async function flyToRequestedLocation(viewer, args, {
     // panel button — instead of generic geocode framing. An explicit rangeM still overrides distance.
     const poiMatch = findPoiByName(query);
     if (poiMatch) {
-      const result = immediate(() => flyToPOI(viewer, poiMatch.cityId, poiMatch.index, {
-        duration: 2.2,
-        onStart: immediateOnStart,
-        ...arrivalHooks,
-        ...(rangeM ? { range: rangeM } : {}),
-      }));
+      const result = immediate(() =>
+        flyToPOI(viewer, poiMatch.cityId, poiMatch.index, {
+          duration: 2.2,
+          onStart: immediateOnStart,
+          ...arrivalHooks,
+          ...(rangeM ? { range: rangeM } : {}),
+        }),
+      );
       const poi = CITY_POIS[poiMatch.cityId]?.pois?.[poiMatch.index];
       if (result === false) return cancelled(poi?.name || query);
       const response = {
@@ -2312,15 +3143,19 @@ async function flyToRequestedLocation(viewer, args, {
         query,
         label: poi?.name || query,
         navigationMode: rangeM ? 'preset-poi-range' : 'preset-poi',
-        rangeM: result?.range ? Math.round(result.range) : (rangeM || null),
+        rangeM: result?.range ? Math.round(result.range) : rangeM || null,
       };
       return afterArrival(response, response.label);
     }
 
-    const generation = typeof beginDeferred === 'function' ? beginDeferred() : null;
+    const generation =
+      typeof beginDeferred === 'function' ? beginDeferred() : null;
     if (generation === false) return cancelled(query);
+    onProgress('search', query);
     const managedDeferred = typeof reassertDeferred === 'function';
-    const destination = await searchAndFlyTo(viewer, query, {
+    const destination = await searchNavigation(viewer, query, {
+      placeSearch,
+      signal,
       ...(rangeM ? { range: rangeM } : {}),
       forceClose: args.viewMode === 'close',
       // 'overview' frames the geocode viewport even for precise-place results —
@@ -2343,19 +3178,30 @@ async function flyToRequestedLocation(viewer, args, {
     return afterArrival(response, response.label);
   }
 
-  throw new Error('fly_to_location needs a locationId, query, or latitude/longitude');
+  throw new Error(
+    'fly_to_location needs a locationId, query, or latitude/longitude',
+  );
 }
 
 function normalizeLocationId(value) {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   if (!raw) return null;
   if (CITY_POIS[raw]) return raw;
   if (CITY_ALIASES.has(raw)) return CITY_ALIASES.get(raw);
   return null;
 }
 
-function getCurrentViewState(viewer, styleManager, dataManager, sceneDirector = null) {
-  const cartographic = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+function getCurrentViewState(
+  viewer,
+  styleManager,
+  dataManager,
+  sceneDirector = null,
+) {
+  const cartographic = Cesium.Cartographic.fromCartesian(
+    viewer.camera.positionWC,
+  );
   return {
     ok: true,
     action: 'get_current_view_state',
@@ -2365,43 +3211,84 @@ function getCurrentViewState(viewer, styleManager, dataManager, sceneDirector = 
       heightM: cartographic.height,
     },
     style: styleManager.activeStyle || 'normal',
-    context: typeof styleManager.getContextModeState === 'function'
-      ? {
-        ...withContextModeVocabulary(styleManager.getContextModeState()),
-        // The numbers on the operator's Contacts panel, so a window/count
-        // question can be answered from what they are looking at.
-        ...(activeContactsWindow() ? { contactsWindow: activeContactsWindow() } : {}),
-      }
-      : null,
-    cockpit: typeof styleManager.getCockpitState === 'function'
-      ? styleManager.getCockpitState()
-      : null,
-    controls: typeof styleManager.getControlState === 'function' ? styleManager.getControlState() : null,
+    context:
+      typeof styleManager.getContextModeState === 'function'
+        ? {
+            ...withContextModeVocabulary(styleManager.getContextModeState()),
+            // The numbers on the operator's Contacts panel, so a window/count
+            // question can be answered from what they are looking at.
+            ...(activeContactsWindow(dataManager)
+              ? { contactsWindow: activeContactsWindow(dataManager) }
+              : {}),
+          }
+        : null,
+    cockpit:
+      typeof styleManager.getCockpitState === 'function'
+        ? styleManager.getCockpitState()
+        : null,
+    controls:
+      typeof styleManager.getControlState === 'function'
+        ? styleManager.getControlState()
+        : null,
     scenePlayback: sceneDirector?.getPlaybackStatus?.() || null,
     tracked: collectTrackedEntities(dataManager),
-    layers: dataManager.getAll().map((layer) => ({
-      id: layer.id,
-      name: layer.name,
-      enabled: layer.enabled,
-      count: layer.stats?.count || 0,
-      error: layer.stats?.error || null,
-    })),
+    // Enabled layers only: the full registry cost ~1k tokens per call and
+    // the model only reasons about what is on.
+    disabledLayerCount: dataManager.getAll().filter((layer) => !layer.enabled)
+      .length,
+    layers: dataManager
+      .getAll()
+      .filter((layer) => layer.enabled)
+      .map((layer) => ({
+        id: layer.id,
+        name: layer.name,
+        enabled: layer.enabled,
+        count: layer.stats?.count || 0,
+        error: layer.stats?.error || null,
+        feedState: layerSnapshot(layer).feedState,
+        source: layerSnapshot(layer).source,
+        lastUpdate: layerSnapshot(layer).lastUpdate,
+      })),
+    feedProvenance: feedProvenanceEnvelope(
+      layerSnapshots(dataManager.getAll()).filter((layer) => layer.enabled),
+    ),
   };
 }
 
-async function getEntityContext(viewer, dataManager, styleManager, args = {}) {
+async function getEntityContext(
+  viewer,
+  dataManager,
+  styleManager,
+  args = {},
+  service = defaultGeospatial,
+) {
   const startedAt = performance.now();
   const scope = String(args.scope || 'auto').toLowerCase();
+  if (scope === 'target' && args.target) {
+    return getTargetContext(viewer, dataManager, styleManager, args, service);
+  }
   const layerId = normalizeLayerId(args.layerId || args.layer);
   const limit = Math.round(clampNumber(args.limit, 1, 12, 5));
   const selected = selectedEntityContext(dataManager);
   const cameraHeightM = viewer.camera.positionCartographic.height;
   const viewTarget = getViewTargetCartographic(viewer);
-  const scenePromise = getSceneContext(viewer, styleManager, dataManager, viewTarget);
-  const selectedWillBeReturned = selected && (scope === 'selected' || scope === 'auto');
-  const visible = (!selectedWillBeReturned && shouldScanVisibleEntities(cameraHeightM))
-    ? visibleEntityContexts(viewer, dataManager, { layerId, limit, target: viewTarget })
-    : [];
+  const scenePromise = getSceneContext(
+    viewer,
+    styleManager,
+    dataManager,
+    viewTarget,
+    service,
+  );
+  const selectedWillBeReturned =
+    selected && (scope === 'selected' || scope === 'auto');
+  const visible =
+    !selectedWillBeReturned && shouldScanVisibleEntities(cameraHeightM)
+      ? visibleEntityContexts(viewer, dataManager, {
+          layerId,
+          limit,
+          target: viewTarget,
+        })
+      : [];
   const scene = await scenePromise;
 
   if ((scope === 'selected' || scope === 'auto') && selected) {
@@ -2428,6 +3315,177 @@ async function getEntityContext(viewer, dataManager, styleManager, args = {}) {
   };
 }
 
+const AIRCRAFT_LAYERS = new Set(['flights', 'military']);
+
+/** Live position of a layer record by id, or null when it is gone. */
+function locateLayerEntity(dataManager, { layerId, id, lat, lon }) {
+  if (!layerId || !id) return null;
+  if (dataManager?.isEnabled && !dataManager.isEnabled(layerId)) return null;
+  let found = null;
+  try {
+    found =
+      dataManager?.layers?.get(layerId)?.module?.findByQuery?.(String(id)) ||
+      null;
+  } catch {
+    found = null;
+  }
+  if (Number.isFinite(found?.latitude) && Number.isFinite(found?.longitude))
+    return { lat: found.latitude, lon: found.longitude, found };
+  const record = getContextStore().entities.get(String(id));
+  if (
+    record?.layerId === layerId &&
+    Number.isFinite(record.latitude) &&
+    Number.isFinite(record.longitude)
+  )
+    return { lat: record.latitude, lon: record.longitude, record };
+  // Analyst-only layers (e.g. bikeshare) have no pick/context lookup. Read
+  // their current snapshot, so a removed or moved record is not resurrected.
+  try {
+    const matches =
+      dataManager?.layers
+        ?.get(layerId)
+        ?.module?.getAnalystRecords?.()
+        .filter(
+          (item) =>
+            String(item.icao24 ?? item.mmsi ?? item.noradId ?? item.id) ===
+            String(id),
+        ) || [];
+    // Bikeshare uses station names as IDs: retain the coordinate identity
+    // even if a namesake disappears. Moving records use their fresh fix.
+    const row =
+      matches.length === 1 && layerId !== 'bikeshare'
+        ? matches[0]
+        : matches.find((item) => item.lat === lat && item.lon === lon);
+    if (Number.isFinite(row?.lat) && Number.isFinite(row?.lon))
+      return {
+        lat: row.lat,
+        lon: row.lon,
+        found: { ...row, latitude: row.lat, longitude: row.lon },
+      };
+  } catch {
+    // A missing or unavailable snapshot cannot establish a live position.
+  }
+  return null;
+}
+
+/**
+ * Describe one pointed or referenced thing without changing the selection:
+ * a live aircraft descriptor for contacts, the context-store record for
+ * everything else. Aircraft fields use the same names as a selected contact,
+ * so the spoken identity line is identical.
+ */
+function describeTargetEntity(dataManager, target) {
+  if (!target?.layerId) return null;
+  const located = locateLayerEntity(dataManager, target);
+  if (located?.record)
+    return summarizeContextRecord(located.record, { includeProperties: true });
+  const found = located?.found;
+  if (!found) {
+    const record = getContextStore().entities.get(String(target.id));
+    return record
+      ? summarizeContextRecord(record, { includeProperties: true })
+      : null;
+  }
+  const name = formatTrackedEntityLabel(found, target.label || target.id);
+  const aircraft = AIRCRAFT_LAYERS.has(target.layerId);
+  const route =
+    found.origin && found.destination
+      ? `${found.origin} → ${found.destination}`
+      : '';
+  return {
+    id: String(target.id),
+    name,
+    layerId: target.layerId,
+    layerName: layerTitle(target.layerId),
+    source: null,
+    latitude: found.latitude ?? null,
+    longitude: found.longitude ?? null,
+    properties: compactProperties(
+      aircraft
+        ? {
+            name,
+            callsign: found.callsign || '',
+            registration: found.registration || '',
+            operator: found.airline || '',
+            type: found.typeName || found.typeCode || '',
+            route,
+            altitude: Number.isFinite(found.altitudeM)
+              ? `${Math.round(found.altitudeM * 3.28084)} ft`
+              : '',
+          }
+        : { name, mmsi: found.mmsi || '', noradId: found.noradId || '' },
+    ),
+    active: true,
+  };
+}
+
+/** get_entity_context for a pointed/referenced target (scope 'target'). */
+async function getTargetContext(
+  viewer,
+  dataManager,
+  styleManager,
+  args,
+  service,
+) {
+  const target = args.target;
+  // Number(null) is 0: a coordinate-less referent must not become (0, 0).
+  const coordinate = (value) =>
+    value === null || value === undefined || value === '' ? NaN : Number(value);
+  let lat = coordinate(target.lat);
+  let lon = coordinate(target.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    const located = locateLayerEntity(dataManager, target);
+    lat = located?.lat ?? NaN;
+    lon = located?.lon ?? NaN;
+  }
+  const hasPosition = Number.isFinite(lat) && Number.isFinite(lon);
+  const viewTarget = hasPosition
+    ? Cesium.Cartographic.fromDegrees(lon, lat)
+    : getViewTargetCartographic(viewer);
+  const selected = describeTargetEntity(dataManager, target);
+  const scene = await getSceneContext(
+    viewer,
+    styleManager,
+    dataManager,
+    viewTarget,
+    service,
+  );
+  if (selected) {
+    return {
+      ok: true,
+      action: 'get_entity_context',
+      scope: 'pointer',
+      scene,
+      selected,
+    };
+  }
+  const cameraHeightM = viewer.camera.positionCartographic.height;
+  const visible = shouldScanVisibleEntities(cameraHeightM)
+    ? visibleEntityContexts(viewer, dataManager, {
+        layerId: normalizeLayerId(args.layerId || args.layer),
+        limit: Math.round(clampNumber(args.limit, 1, 12, 5)),
+        target: viewTarget,
+      })
+    : [];
+  return {
+    ok: true,
+    action: 'get_entity_context',
+    scope: 'pointer',
+    scene,
+    selected: null,
+    ...(hasPosition
+      ? {
+          pointer: {
+            latitude: Number(lat.toFixed(5)),
+            longitude: Number(lon.toFixed(5)),
+          },
+        }
+      : {}),
+    visible,
+    count: visible.length,
+  };
+}
+
 /**
  * Answer an entity-centred "how many aircraft nearby" from the Contacts
  * engine, or null when the question is not that.
@@ -2441,58 +3499,207 @@ async function getEntityContext(viewer, dataManager, styleManager, args = {}) {
  * @param {object} result The general engine's result, reused for scope text.
  * @returns {object|null} A unified-count payload, or null.
  */
-function aircraftProximityWindowForQuery(args, result) {
+async function aircraftProximityWindowForQuery(
+  dataManager,
+  args,
+  result,
+  isCurrent = () => true,
+) {
+  // Follow-ups re-filter the engine's retained answer. Re-projecting a fresh
+  // Contacts snapshot here would restore rows a previous filter removed.
+  if (result?.coverage?.followUp) return null;
+  const spec = normalizeAnalystSpec(args, args?.layers || []);
+  if (!spec) return null;
   const scope = args?.scope;
   if (String(scope?.kind || '').toLowerCase() !== 'radius') return null;
   const layers = Array.isArray(args.layers) ? args.layers : [];
-  if (!layers.some((layer) => layer === 'flights' || layer === 'military')) return null;
-  const snapshot = militaryAwarenessLayer.getContextSnapshot?.();
+  if (!layers.some((layer) => layer === 'flights' || layer === 'military'))
+    return null;
+  const awareness = dataManager?.layers?.get('military-awareness')?.module;
+  const snapshot = awareness?.getAircraftQuerySnapshot?.();
   const subject = snapshot?.subject;
   if (!subject?.position) return null;
   // An explicit centre only qualifies when it IS the subject; otherwise the
   // operator asked about somewhere else and must get that answer.
-  if (scope.center && !centerMatchesSubject(scope.center, subject.position)) return null;
-  const radiusM = Number.isFinite(scope.km) ? scope.km * 1000 : (snapshot.radiusM || 250_000);
-  const window = collectAircraftProximityWindow(subject.position, { radiusM, subject });
-  if (!window) return null;
+  if (scope.center && !centerMatchesSubject(scope.center, subject.position))
+    return null;
+  const radiusM = Number.isFinite(scope.km)
+    ? scope.km * 1000
+    : snapshot.radiusM || 250_000;
+  // A different radius is a different question. Let the general analyst
+  // engine answer it instead of relabelling the panel's 250 km snapshot.
+  if (
+    Number.isFinite(snapshot.radiusM) &&
+    Math.abs(radiusM - snapshot.radiusM) > 1
+  )
+    return null;
   const label = subject.label || subject.id || 'the selected contact';
   const radiusKm = Math.round(radiusM / 1000);
-  const wanted = new Set(layers);
-  const items = [
-    ...(wanted.has('flights') ? window.flights.map((item) => ({ ...item, layerKey: 'flights' })) : []),
-    ...(wanted.has('military') ? window.military.map((item) => ({ ...item, layerKey: 'military' })) : []),
-  ];
-  const count = items.length;
-  return {
+  const wanted = layers.filter(
+    (layer) => layer === 'flights' || layer === 'military',
+  );
+  // Provenance belongs to the Awareness evaluation, not the current layer
+  // registry. The panel deliberately retains a cohort between render-cadence
+  // refreshes, so a live registry read here could already describe a newer
+  // source state than the count and items the operator is looking at.
+  const retainedProvenance = wanted
+    .map((key) => snapshot.cohorts?.[key]?.provenance)
+    .filter(Boolean);
+  const feedProvenance = feedProvenanceEnvelope(retainedProvenance);
+  const sourceSnapshotsById = new Map(
+    feedProvenance.layers.map((layer) => [layer.id, layer]),
+  );
+  // The cohort is the panel's; each contact is joined to its loaded analyst
+  // record so the same filters, ranking and item shape apply as everywhere
+  // else. The cohort still owns membership and distance.
+  const distanceKm = new WeakMap();
+  const groups = wanted.map((key) => {
+    const records = new Map();
+    for (const record of dataManager.layers
+      .get(key)
+      ?.module?.getAnalystRecords?.(ANALYST_RECORD_CAP) || [])
+      if (record?.icao24) records.set(record.icao24, record);
+    const rows = (snapshot.cohorts?.[key]?.items || []).map((item) => {
+      const record = records.get(item.icao24);
+      let lat = record?.lat;
+      let lon = record?.lon;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        const carto = item.position
+          ? Cesium.Cartographic.fromCartesian(item.position)
+          : null;
+        lat = carto ? Cesium.Math.toDegrees(carto.latitude) : null;
+        lon = carto ? Cesium.Math.toDegrees(carto.longitude) : null;
+      }
+      const row = {
+        ...(record || {
+          id: item.id,
+          icao24: item.icao24,
+          callsign: item.callsign ?? null,
+          altitudeM: item.altitudeM ?? null,
+          speedMps: item.velocityMps ?? null,
+          aircraftClass: item.aircraftClass ?? null,
+        }),
+        lat,
+        lon,
+      };
+      // Rank the retained cohort at its original precision; display rounding
+      // must not turn nearby contacts into artificial ID-sorted ties.
+      if (Number.isFinite(item.distance))
+        distanceKm.set(row, item.distance / 1000);
+      return row;
+    });
+    return { key, rows };
+  });
+  const selection = await selectAnalystRows(groups, {
+    filters: spec.filters,
+    sortBy: spec.sortBy,
+    sortDir: spec.sortDir,
+    limit: Math.round(clampNumber(args.limit, 1, 50, 12)),
+    layerKeys: wanted,
+    distanceOf: (row) => distanceKm.get(row),
+    isCurrent,
+  });
+  if (!selection || !isCurrent()) return null;
+  const items = selection.items.map(compactAnalystItem);
+  const complete = wanted.every((key) => {
+    const cohort = snapshot.cohorts?.[key];
+    return Number.isFinite(cohort?.count) && cohort.complete !== false;
+  });
+  const genericLayers = new Map(
+    (result?.coverage?.layersQueried || []).map((layer) => [
+      layer.layerKey,
+      layer,
+    ]),
+  );
+  const layersQueried = wanted.map((key) => {
+    const cohort = snapshot.cohorts?.[key] || {};
+    const generic = genericLayers.get(key) || {};
+    const sourceSnapshot = sourceSnapshotsById.get(key);
+    const returned = Number.isFinite(cohort.count)
+      ? cohort.count
+      : cohort.items?.length || 0;
+    return {
+      layerKey: key,
+      ...(generic.status ? { status: generic.status } : {}),
+      ...(generic.note ? { note: generic.note } : {}),
+      ...(generic.window ? { window: generic.window } : {}),
+      returned,
+      total: cohort.complete === false ? null : returned,
+      truncated: cohort.complete === false,
+      ...(cohort.source ? { source: cohort.source } : {}),
+      ...(sourceSnapshot
+        ? {
+            feedState: sourceSnapshot.feedState,
+            source: sourceSnapshot.source,
+            lastUpdate: sourceSnapshot.lastUpdate,
+            enabled: sourceSnapshot.enabled,
+            error: sourceSnapshot.error,
+          }
+        : {}),
+    };
+  });
+  const coverage = {
+    layersQueried,
+    records: {
+      returned: selection.count,
+      total: complete ? selection.count : null,
+      truncated: !complete,
+    },
+    scope: `window:${radiusKm}km@${label}`,
+    followUp: false,
+    feedProvenance,
+    note: `Contacts panel snapshot${snapshot.evaluatedAt ? ` at ${new Date(snapshot.evaluatedAt).toISOString()}` : ''} — the same retained cohort supplies the card, speech, and follow-up memory${complete ? '' : '; the count is a lower bound because at least one layer reached its retained limit'}.`,
+  };
+  const answer = {
     ok: true,
     action: 'analyst_query',
-    count,
+    count: selection.count,
+    complete,
     scopeLabel: `within ${radiusKm} km of ${label}`,
-    truncated: false,
-    items: items.slice(0, Math.round(clampNumber(args.limit, 1, 50, 12))).map((item) => ({
-      layerKey: item.layerKey,
-      id: item.id,
-      ...(item.icao24 ? { icao24: item.icao24 } : {}),
-      ...(item.callsign ? { callsign: item.callsign } : {}),
-      ...(Number.isFinite(item.distance) ? { distanceKm: Math.round(item.distance / 100) / 10 } : {}),
-    })),
-    summary: { count },
-    coverage: {
-      layersQueried: result?.coverage?.layersQueried || [],
-      scope: `window:${radiusKm}km@${label}`,
-      followUp: false,
-      note: 'Contacts window engine — the same computation and cohort the Contacts panel displays, so this count matches the panel exactly — counts cover loaded data; the flights layer loads by viewport.',
+    listed: items.length,
+    items,
+    summary: selection.summary,
+    ...(result?.partial
+      ? { partial: true, unanswered: [...(result.unanswered || [])] }
+      : {}),
+    display: {
+      scope: `within ${radiusKm} km of ${label} (Contacts window)`,
     },
+    coverage,
     // (D) The answer always says whose window it is and which engine produced it.
     window: {
       engine: 'contacts-window',
       centeredOn: label,
       radiusKm,
-      flights: window.flights.length,
-      military: window.military.length,
-      aircraft: window.aircraft,
+      flights: snapshot.cohorts?.flights?.count ?? 'unknown',
+      military: snapshot.cohorts?.military?.count ?? 'unknown',
+      aircraft:
+        Number.isFinite(snapshot.cohorts?.flights?.count) &&
+        Number.isFinite(snapshot.cohorts?.military?.count)
+          ? snapshot.cohorts.flights.count + snapshot.cohorts.military.count
+          : 'unknown',
+      complete,
+      evaluatedAt: snapshot.evaluatedAt || null,
     },
-    ...(activeContactsWindow() ? { contactsWindow: activeContactsWindow() } : {}),
+    ...(snapshot.contactsWindow
+      ? { contactsWindow: { ...snapshot.contactsWindow } }
+      : {}),
+    feedProvenance,
+    feedState: feedProvenance.overall,
+  };
+  return {
+    answer,
+    memory: {
+      matched: selection.matched,
+      // Follow-up ranking belongs to this retained Contacts evaluation, not
+      // the camera's current position. Keep the accessor with its row owners.
+      distanceOf: (row) => distanceKm.get(row),
+      layerKeys: wanted,
+      coverage,
+      unanswered: [...(result?.unanswered || [])],
+      scopeLabel: answer.scopeLabel,
+      scopeDetail: answer.display.scope,
+    },
   };
 }
 
@@ -2518,12 +3725,16 @@ const SUBJECT_CENTER_TOLERANCE_KM = 1;
  * @returns {boolean} True when the two are the same place.
  */
 function centerMatchesSubject(center, subjectPosition) {
-  if (!Number.isFinite(center?.lat) || !Number.isFinite(center?.lon)) return false;
+  if (!Number.isFinite(center?.lat) || !Number.isFinite(center?.lon))
+    return false;
   const carto = Cesium.Cartographic.fromCartesian(subjectPosition);
   if (!carto) return false;
   const subjectLat = Cesium.Math.toDegrees(carto.latitude);
   const subjectLon = Cesium.Math.toDegrees(carto.longitude);
-  return haversineKm(subjectLat, subjectLon, center.lat, center.lon) <= SUBJECT_CENTER_TOLERANCE_KM;
+  return (
+    haversineKm(subjectLat, subjectLon, center.lat, center.lon) <=
+    SUBJECT_CENTER_TOLERANCE_KM
+  );
 }
 
 function shouldScanVisibleEntities(cameraHeightM) {
@@ -2536,7 +3747,11 @@ function selectedEntityContext(dataManager) {
   return summarizeContextRecord(record, { includeProperties: true });
 }
 
-function visibleEntityContexts(viewer, dataManager, { layerId = null, limit = 5, target = null } = {}) {
+function visibleEntityContexts(
+  viewer,
+  dataManager,
+  { layerId = null, limit = 5, target = null } = {},
+) {
   const nearbyRecords = [];
   const canvas = viewer.scene.canvas;
   const width = canvas.clientWidth || canvas.width || 0;
@@ -2547,28 +3762,52 @@ function visibleEntityContexts(viewer, dataManager, { layerId = null, limit = 5,
   const targetLon = target ? Cesium.Math.toDegrees(target.longitude) : null;
   const store = getContextStore();
   const enabledLayerIds = new Set(
-    dataManager.getAll().filter((layer) => layer.enabled).map((layer) => layer.id)
+    dataManager
+      .getAll()
+      .filter((layer) => layer.enabled)
+      .map((layer) => layer.id),
   );
 
   for (const record of store.entities.values()) {
     if (layerId && record.layerId !== layerId) continue;
     if (record.layerId && !enabledLayerIds.has(record.layerId)) continue;
-    if (record.entity?.show === false || record.dataSource?.show === false) continue;
-    if (!Number.isFinite(record.latitude) || !Number.isFinite(record.longitude)) continue;
-    insertNearestRecord(nearbyRecords, {
-      record,
-      distanceScore: target
-        ? approximateCoordinateDistanceSq(targetLat, targetLon, record.latitude, record.longitude)
-        : 0,
-    }, VISIBLE_ENTITY_SHORTLIST);
+    if (record.entity?.show === false || record.dataSource?.show === false)
+      continue;
+    if (!Number.isFinite(record.latitude) || !Number.isFinite(record.longitude))
+      continue;
+    insertNearestRecord(
+      nearbyRecords,
+      {
+        record,
+        distanceScore: target
+          ? approximateCoordinateDistanceSq(
+              targetLat,
+              targetLon,
+              record.latitude,
+              record.longitude,
+            )
+          : 0,
+      },
+      VISIBLE_ENTITY_SHORTLIST,
+    );
   }
 
   const candidates = [];
   for (const { record } of nearbyRecords) {
     const position = record.entity?.__localBaseCartesian;
     if (!position) continue;
-    const screen = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, position);
-    if (!screen || screen.x < 0 || screen.y < 0 || screen.x > width || screen.y > height) continue;
+    const screen = Cesium.SceneTransforms.worldToWindowCoordinates(
+      viewer.scene,
+      position,
+    );
+    if (
+      !screen ||
+      screen.x < 0 ||
+      screen.y < 0 ||
+      screen.x > width ||
+      screen.y > height
+    )
+      continue;
     const dx = screen.x - centerX;
     const dy = screen.y - centerY;
     candidates.push({
@@ -2589,23 +3828,34 @@ function insertNearestRecord(records, candidate, limit) {
     records.sort((a, b) => a.distanceScore - b.distanceScore);
     return;
   }
-  if (candidate.distanceScore >= records[records.length - 1].distanceScore) return;
+  if (candidate.distanceScore >= records[records.length - 1].distanceScore)
+    return;
 
   let low = 0;
   let high = records.length;
   while (low < high) {
     const middle = (low + high) >> 1;
-    if (records[middle].distanceScore <= candidate.distanceScore) low = middle + 1;
+    if (records[middle].distanceScore <= candidate.distanceScore)
+      low = middle + 1;
     else high = middle;
   }
   records.splice(low, 0, candidate);
   records.pop();
 }
 
-async function getSceneContext(viewer, styleManager, dataManager, viewTarget = null) {
-  const cartographic = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
-  const basemap = await getBasemapContext(viewer, viewTarget);
-  const enabledLayers = dataManager.getAll()
+async function getSceneContext(
+  viewer,
+  styleManager,
+  dataManager,
+  viewTarget = null,
+  service = defaultGeospatial,
+) {
+  const cartographic = Cesium.Cartographic.fromCartesian(
+    viewer.camera.positionWC,
+  );
+  const basemap = await getBasemapContext(viewer, viewTarget, service);
+  const enabledLayers = dataManager
+    .getAll()
     .filter((layer) => layer.enabled)
     .map((layer) => ({
       id: layer.id,
@@ -2616,7 +3866,9 @@ async function getSceneContext(viewer, styleManager, dataManager, viewTarget = n
   return {
     camera: {
       latitude: Number(Cesium.Math.toDegrees(cartographic.latitude).toFixed(6)),
-      longitude: Number(Cesium.Math.toDegrees(cartographic.longitude).toFixed(6)),
+      longitude: Number(
+        Cesium.Math.toDegrees(cartographic.longitude).toFixed(6),
+      ),
       heightM: Math.round(cartographic.height),
     },
     basemap,
@@ -2625,21 +3877,32 @@ async function getSceneContext(viewer, styleManager, dataManager, viewTarget = n
   };
 }
 
-async function getBasemapContext(viewer, viewTarget = null) {
+async function getBasemapContext(
+  viewer,
+  viewTarget = null,
+  service = defaultGeospatial,
+) {
+  const { reverseGeocodeCache, nearbyPlacesCache } = cachesFor(service);
   const target = viewTarget;
   const samples = sampleViewportCartographics(viewer);
-  const cameraCartographic = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+  const cameraCartographic = Cesium.Cartographic.fromCartesian(
+    viewer.camera.positionWC,
+  );
   const cameraHeightM = cameraCartographic.height;
   const viewScale = classifyViewScale(cameraHeightM);
-  const cachedViewportPlaces = viewportPlacesFromCache(samples, cameraHeightM);
+  const cachedViewportPlaces = viewportPlacesFromCache(
+    samples,
+    cameraHeightM,
+    service,
+  );
   const viewportPlacesPromise = cachedViewportPlaces
     ? Promise.resolve(cachedViewportPlaces)
-    : reverseGeocodeViewportSamples(samples, cameraHeightM);
+    : reverseGeocodeViewportSamples(samples, cameraHeightM, service);
   if (!target) {
     const viewportPlaces = await resolveWithin(
       viewportPlacesPromise,
       BASEMAP_CONTEXT_WAIT_MS,
-      cachedViewportPlaces
+      cachedViewportPlaces,
     );
     return {
       source: 'Google Photorealistic 3D Tiles / Cesium basemap',
@@ -2655,26 +3918,55 @@ async function getBasemapContext(viewer, viewTarget = null) {
   const latitude = Number(Cesium.Math.toDegrees(target.latitude).toFixed(6));
   const longitude = Number(Cesium.Math.toDegrees(target.longitude).toFixed(6));
   const inferredCountry = inferCountryFromSamples(samples);
-  const knownLandmarks = nearbyKnownLandmarks(latitude, longitude, cameraHeightM);
-  const fallbackPlace = coarseBasemapPlace(viewScale, latitude, longitude, inferredCountry);
+  const knownLandmarks = nearbyKnownLandmarks(
+    latitude,
+    longitude,
+    cameraHeightM,
+  );
+  const fallbackPlace = coarseBasemapPlace(
+    viewScale,
+    latitude,
+    longitude,
+    inferredCountry,
+  );
   const cachedPlace = shouldReverseGeocode(cameraHeightM)
-    ? reverseGeocodeCache.get(reverseGeocodeKey(latitude, longitude)) || null
+    ? reverseGeocodeCache.get(
+        reverseGeocodeKey(latitude, longitude, service),
+      ) || null
     : null;
-  const nearbyCacheKey = nearbyPlacesCacheKey(latitude, longitude, cameraHeightM);
-  const cachedNearbyPlaces = shouldFetchNearbyPlaces(cameraHeightM) && nearbyPlacesCache.has(nearbyCacheKey)
-    ? nearbyPlacesCache.get(nearbyCacheKey)
-    : null;
-  const placePromise = shouldReverseGeocode(cameraHeightM) && !cachedPlace
-    ? reverseGeocode(latitude, longitude)
-    : Promise.resolve(cachedPlace);
-  const nearbyPlacesPromise = shouldFetchNearbyPlaces(cameraHeightM) && !cachedNearbyPlaces
-    ? fetchNearbyPlaces(latitude, longitude, cameraHeightM)
-    : Promise.resolve(cachedNearbyPlaces);
-  const [viewportPlaces, resolvedPlace, resolvedNearbyPlaces] = await Promise.all([
-    resolveWithin(viewportPlacesPromise, BASEMAP_CONTEXT_WAIT_MS, cachedViewportPlaces),
-    resolveWithin(placePromise, BASEMAP_CONTEXT_WAIT_MS, cachedPlace),
-    resolveWithin(nearbyPlacesPromise, BASEMAP_CONTEXT_WAIT_MS, cachedNearbyPlaces),
-  ]);
+  const nearbyCacheKey = nearbyPlacesCacheKey(
+    latitude,
+    longitude,
+    cameraHeightM,
+    service,
+  );
+  const cachedNearbyPlaces =
+    shouldFetchNearbyPlaces(cameraHeightM) &&
+    nearbyPlacesCache.has(nearbyCacheKey)
+      ? nearbyPlacesCache.get(nearbyCacheKey)
+      : null;
+  const placePromise =
+    shouldReverseGeocode(cameraHeightM) && !cachedPlace
+      ? reverseGeocode(latitude, longitude, service)
+      : Promise.resolve(cachedPlace);
+  const nearbyPlacesPromise =
+    shouldFetchNearbyPlaces(cameraHeightM) && !cachedNearbyPlaces
+      ? fetchNearbyPlaces(latitude, longitude, cameraHeightM, service)
+      : Promise.resolve(cachedNearbyPlaces);
+  const [viewportPlaces, resolvedPlace, resolvedNearbyPlaces] =
+    await Promise.all([
+      resolveWithin(
+        viewportPlacesPromise,
+        BASEMAP_CONTEXT_WAIT_MS,
+        cachedViewportPlaces,
+      ),
+      resolveWithin(placePromise, BASEMAP_CONTEXT_WAIT_MS, cachedPlace),
+      resolveWithin(
+        nearbyPlacesPromise,
+        BASEMAP_CONTEXT_WAIT_MS,
+        cachedNearbyPlaces,
+      ),
+    ]);
   const place = resolvedPlace || fallbackPlace;
   const nearbyPlaces = resolvedNearbyPlaces || [];
   return {
@@ -2717,13 +4009,14 @@ function shouldFetchNearbyPlaces(cameraHeightM) {
 
 function nearbyKnownLandmarks(latitude, longitude, cameraHeightM) {
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return [];
-  const maxDistanceKm = cameraHeightM <= 5000
-    ? 2
-    : cameraHeightM <= 50000
-      ? 10
-      : cameraHeightM <= 250000
-        ? 35
-        : 0;
+  const maxDistanceKm =
+    cameraHeightM <= 5000
+      ? 2
+      : cameraHeightM <= 50000
+        ? 10
+        : cameraHeightM <= 250000
+          ? 35
+          : 0;
   if (maxDistanceKm <= 0) return [];
 
   const matches = [];
@@ -2752,12 +4045,19 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   return 2 * radiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function coarseBasemapPlace(viewScale, latitude, longitude, inferredCountry = null) {
+function coarseBasemapPlace(
+  viewScale,
+  latitude,
+  longitude,
+  inferredCountry = null,
+) {
   if (viewScale === 'global') {
     return {
       formattedAddress: 'Global Earth view',
@@ -2784,14 +4084,19 @@ function coarseBasemapPlace(viewScale, latitude, longitude, inferredCountry = nu
 function getViewTargetCartographic(viewer) {
   const signature = cameraViewSignature(viewer);
   const cached = viewTargetCache.get(viewer);
-  if (cached?.signature === signature && performance.now() - cached.cachedAt < 2500) {
+  if (
+    cached?.signature === signature &&
+    performance.now() - cached.cachedAt < 2500
+  ) {
     return cached.target;
   }
   const position = getViewTargetCartesian(viewer);
   // `fromCartesian` still returns undefined for a point too near the ellipsoid
   // center to project; normalize that to the same "no target" null the callers
   // already handle for a missed pick.
-  const target = position ? (Cesium.Cartographic.fromCartesian(position) || null) : null;
+  const target = position
+    ? Cesium.Cartographic.fromCartesian(position) || null
+    : null;
   viewTargetCache.set(viewer, {
     signature,
     target,
@@ -2836,8 +4141,11 @@ function getViewTargetCartesian(viewer) {
     }
   }
 
-  if (!isPickedWorldPosition(position)
-    && viewer.camera && typeof viewer.camera.pickEllipsoid === 'function') {
+  if (
+    !isPickedWorldPosition(position) &&
+    viewer.camera &&
+    typeof viewer.camera.pickEllipsoid === 'function'
+  ) {
     try {
       position = viewer.camera.pickEllipsoid(center, Cesium.Ellipsoid.WGS84);
     } catch {
@@ -2845,8 +4153,11 @@ function getViewTargetCartesian(viewer) {
     }
   }
 
-  if (!isPickedWorldPosition(position)
-    && viewer.camera && typeof viewer.camera.getPickRay === 'function') {
+  if (
+    !isPickedWorldPosition(position) &&
+    viewer.camera &&
+    typeof viewer.camera.getPickRay === 'function'
+  ) {
     try {
       const ray = viewer.camera.getPickRay(center);
       position = scene.globe?.pick(ray, scene) || null;
@@ -2879,7 +4190,7 @@ function sampleViewportCartographics(viewer) {
   for (const [x, y] of points) {
     const cartesian = viewer.camera.pickEllipsoid(
       new Cesium.Cartesian2(width * x, height * y),
-      Cesium.Ellipsoid.WGS84
+      Cesium.Ellipsoid.WGS84,
     );
     if (!isPickedWorldPosition(cartesian)) continue;
     const carto = Cesium.Cartographic.fromCartesian(cartesian);
@@ -2926,55 +4237,40 @@ function inferCountry(latitude, longitude) {
     { name: 'North Korea', south: 37.5, north: 43.2, west: 124.0, east: 131.0 },
     { name: 'China', south: 18.0, north: 53.8, west: 73.0, east: 135.2 },
     { name: 'Russia', south: 41.0, north: 82.0, west: 19.0, east: 180.0 },
-    { name: 'United States', south: 24.0, north: 49.8, west: -125.0, east: -66.0 },
+    {
+      name: 'United States',
+      south: 24.0,
+      north: 49.8,
+      west: -125.0,
+      east: -66.0,
+    },
   ];
-  const region = regions.find((item) => (
-    latitude >= item.south &&
-    latitude <= item.north &&
-    longitude >= item.west &&
-    longitude <= item.east
-  ));
+  const region = regions.find(
+    (item) =>
+      latitude >= item.south &&
+      latitude <= item.north &&
+      longitude >= item.west &&
+      longitude <= item.east,
+  );
   return region?.name || null;
 }
 
-async function reverseGeocode(latitude, longitude) {
-  const apiKey = window.__GOOGLE_MAPS_API_KEY__;
-  if (!apiKey || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-  const key = reverseGeocodeKey(latitude, longitude);
+async function reverseGeocode(latitude, longitude, service) {
+  const { reverseGeocodeCache, reverseGeocodeInFlight } = cachesFor(service);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  const key = reverseGeocodeKey(latitude, longitude, service);
   if (reverseGeocodeCache.has(key)) return reverseGeocodeCache.get(key);
   if (reverseGeocodeInFlight.has(key)) return reverseGeocodeInFlight.get(key);
 
   const request = (async () => {
     try {
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${encodeURIComponent(`${latitude},${longitude}`)}&key=${apiKey}`;
-      const response = await fetchWithTimeout(url, {}, 5000);
-      const data = await response.json();
-      if (data.status !== 'OK' || !data.results?.length) {
-        reverseGeocodeCache.set(key, null);
-        return null;
+      const place =
+        (await service.reverseGeocode?.(latitude, longitude)) || null;
+      if (place) {
+        reverseGeocodeCache.set(key, place);
+        if (reverseGeocodeCache.size > 256)
+          reverseGeocodeCache.delete(reverseGeocodeCache.keys().next().value);
       }
-
-      const result = data.results[0];
-      const relevantResults = data.results.slice(0, 12);
-      const components = Array.isArray(result.address_components) ? result.address_components : [];
-      const component = (type) => components.find((item) => item.types?.includes(type))?.long_name || null;
-      const labels = uniqueStrings(relevantResults.map((item) => item.formatted_address)).slice(0, 12);
-      const streetLabels = uniqueStrings(relevantResults.flatMap((item) => {
-        const itemComponents = Array.isArray(item.address_components) ? item.address_components : [];
-        return itemComponents
-          .filter((entry) => entry.types?.includes('route'))
-          .map((entry) => entry.long_name);
-      })).slice(0, 12);
-      const place = {
-        formattedAddress: result.formatted_address || null,
-        locality: component('locality') || component('postal_town') || component('administrative_area_level_2'),
-        region: component('administrative_area_level_1'),
-        country: component('country'),
-        types: result.types || [],
-        labels,
-        streetLabels,
-      };
-      reverseGeocodeCache.set(key, place);
       return place;
     } catch {
       return null;
@@ -2986,47 +4282,68 @@ async function reverseGeocode(latitude, longitude) {
   return request;
 }
 
-async function reverseGeocodeViewportSamples(samples, cameraHeightM) {
-  if (!shouldReverseGeocodeViewport(cameraHeightM) || !samples.length) return null;
+async function reverseGeocodeViewportSamples(samples, cameraHeightM, service) {
+  if (!shouldReverseGeocodeViewport(cameraHeightM) || !samples.length)
+    return null;
   // At building scale, center geocoding plus Nearby Places is more precise and
   // avoids three redundant Google requests.
   if (cameraHeightM <= 10000) return null;
   const prioritySamples = [samples[0], samples[1], samples[2]].filter(Boolean);
-  const places = (await Promise.all(prioritySamples.map(async (sample) => {
-    const place = await reverseGeocode(sample.latitude, sample.longitude);
-    if (!place) return null;
-    return {
-      latitude: sample.latitude,
-      longitude: sample.longitude,
-      formattedAddress: place.formattedAddress,
-      locality: place.locality,
-      region: place.region,
-      country: place.country,
-      types: place.types,
-      labels: place.labels,
-      streetLabels: place.streetLabels,
-    };
-  }))).filter(Boolean);
+  const places = (
+    await Promise.all(
+      prioritySamples.map(async (sample) => {
+        const place = await reverseGeocode(
+          sample.latitude,
+          sample.longitude,
+          service,
+        );
+        if (!place) return null;
+        return {
+          latitude: sample.latitude,
+          longitude: sample.longitude,
+          formattedAddress: place.formattedAddress,
+          locality: place.locality,
+          region: place.region,
+          country: place.country,
+          types: place.types,
+          labels: place.labels,
+          streetLabels: place.streetLabels,
+        };
+      }),
+    )
+  ).filter(Boolean);
   return summarizeViewportPlaces(places);
 }
 
-function viewportPlacesFromCache(samples, cameraHeightM) {
-  if (!shouldReverseGeocodeViewport(cameraHeightM) || cameraHeightM <= 10000 || !samples.length) return null;
-  const places = [samples[0], samples[1], samples[2]].filter(Boolean).flatMap((sample) => {
-    const place = reverseGeocodeCache.get(reverseGeocodeKey(sample.latitude, sample.longitude));
-    if (!place) return [];
-    return [{
-      latitude: sample.latitude,
-      longitude: sample.longitude,
-      formattedAddress: place.formattedAddress,
-      locality: place.locality,
-      region: place.region,
-      country: place.country,
-      types: place.types,
-      labels: place.labels,
-      streetLabels: place.streetLabels,
-    }];
-  });
+function viewportPlacesFromCache(samples, cameraHeightM, service) {
+  const { reverseGeocodeCache } = cachesFor(service);
+  if (
+    !shouldReverseGeocodeViewport(cameraHeightM) ||
+    cameraHeightM <= 10000 ||
+    !samples.length
+  )
+    return null;
+  const places = [samples[0], samples[1], samples[2]]
+    .filter(Boolean)
+    .flatMap((sample) => {
+      const place = reverseGeocodeCache.get(
+        reverseGeocodeKey(sample.latitude, sample.longitude, service),
+      );
+      if (!place) return [];
+      return [
+        {
+          latitude: sample.latitude,
+          longitude: sample.longitude,
+          formattedAddress: place.formattedAddress,
+          locality: place.locality,
+          region: place.region,
+          country: place.country,
+          types: place.types,
+          labels: place.labels,
+          streetLabels: place.streetLabels,
+        },
+      ];
+    });
   return summarizeViewportPlaces(places);
 }
 
@@ -3034,33 +4351,47 @@ function summarizeViewportPlaces(places) {
   if (!places.length) return null;
   return {
     samples: places,
-    dominantCountry: dominantValue(places.map((place) => place.country).filter(Boolean)),
-    dominantRegion: dominantValue(places.map((place) => place.region).filter(Boolean)),
-    dominantLocality: dominantValue(places.map((place) => place.locality).filter(Boolean)),
-    visibleLabels: uniqueStrings(places.flatMap((place) => place.labels || [])).slice(0, 24),
-    streetLabels: uniqueStrings(places.flatMap((place) => place.streetLabels || [])).slice(0, 20),
+    dominantCountry: dominantValue(
+      places.map((place) => place.country).filter(Boolean),
+    ),
+    dominantRegion: dominantValue(
+      places.map((place) => place.region).filter(Boolean),
+    ),
+    dominantLocality: dominantValue(
+      places.map((place) => place.locality).filter(Boolean),
+    ),
+    visibleLabels: uniqueStrings(
+      places.flatMap((place) => place.labels || []),
+    ).slice(0, 24),
+    streetLabels: uniqueStrings(
+      places.flatMap((place) => place.streetLabels || []),
+    ).slice(0, 20),
   };
 }
 
-async function fetchNearbyPlaces(latitude, longitude, cameraHeightM) {
+async function fetchNearbyPlaces(latitude, longitude, cameraHeightM, service) {
+  const { nearbyPlacesCache, nearbyPlacesInFlight } = cachesFor(service);
   const radiusM = nearbyPlacesRadiusM(cameraHeightM);
-  const cacheKey = nearbyPlacesCacheKey(latitude, longitude, cameraHeightM);
+  const cacheKey = nearbyPlacesCacheKey(
+    latitude,
+    longitude,
+    cameraHeightM,
+    service,
+  );
   if (nearbyPlacesCache.has(cacheKey)) return nearbyPlacesCache.get(cacheKey);
-  if (nearbyPlacesInFlight.has(cacheKey)) return nearbyPlacesInFlight.get(cacheKey);
+  if (nearbyPlacesInFlight.has(cacheKey))
+    return nearbyPlacesInFlight.get(cacheKey);
 
   const request = (async () => {
     try {
-      const params = new URLSearchParams({
-        lat: String(latitude),
-        lon: String(longitude),
-        radiusM: String(radiusM),
-      });
-      const response = await fetchWithTimeout(`/api/google/nearby-places?${params}`, {}, 5000);
-      const data = await response.json().catch(() => null);
-      const places = response.ok && Array.isArray(data?.places)
-      ? data.places.filter((place) => place?.name).slice(0, 12)
-        : [];
+      const places = (
+        (await service.nearby?.({ latitude, longitude, radiusM })) || []
+      )
+        .filter((place) => place?.name)
+        .slice(0, 12);
       nearbyPlacesCache.set(cacheKey, places);
+      if (nearbyPlacesCache.size > 256)
+        nearbyPlacesCache.delete(nearbyPlacesCache.keys().next().value);
       return places;
     } catch {
       return [];
@@ -3073,9 +4404,9 @@ async function fetchNearbyPlaces(latitude, longitude, cameraHeightM) {
 }
 
 function uniqueStrings(values) {
-  return [...new Set(values
-    .map((value) => sanitizeLabel(value))
-    .filter(Boolean))];
+  return [
+    ...new Set(values.map((value) => sanitizeLabel(value)).filter(Boolean)),
+  ];
 }
 
 /**
@@ -3092,28 +4423,24 @@ function sanitizeLabel(value) {
   let out = '';
   for (const ch of text) {
     const code = ch.codePointAt(0);
-    out += (code < 0x20 || code === 0x7f) ? ' ' : ch; // drop control chars incl. newlines
+    out += code < 0x20 || code === 0x7f ? ' ' : ch; // drop control chars incl. newlines
   }
   return out.replace(/\s+/g, ' ').trim().slice(0, 120);
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    window.clearTimeout(timeout);
-  }
+function cachePrecision(service) {
+  return Number.isInteger(service?.cachePrecision)
+    ? Math.max(3, Math.min(6, service.cachePrecision))
+    : 4;
 }
 
-function reverseGeocodeKey(latitude, longitude) {
-  return `${latitude.toFixed(4)},${longitude.toFixed(4)}`;
+function reverseGeocodeKey(latitude, longitude, service) {
+  return `${latitude.toFixed(cachePrecision(service))},${longitude.toFixed(cachePrecision(service))}`;
 }
 
-function nearbyPlacesCacheKey(latitude, longitude, cameraHeightM) {
+function nearbyPlacesCacheKey(latitude, longitude, cameraHeightM, service) {
   const radiusM = nearbyPlacesRadiusM(cameraHeightM);
-  return `${latitude.toFixed(4)},${longitude.toFixed(4)},${radiusM}`;
+  return `${latitude.toFixed(cachePrecision(service))},${longitude.toFixed(cachePrecision(service))},${radiusM}`;
 }
 
 function nearbyPlacesRadiusM(cameraHeightM) {
@@ -3138,14 +4465,17 @@ async function resolveWithin(promise, timeoutMs, fallback) {
 
 function approximateCoordinateDistanceSq(latA, lonA, latB, lonB) {
   const latDelta = latB - latA;
-  const lonDelta = (lonB - lonA) * Math.cos(Cesium.Math.toRadians((latA + latB) / 2));
+  const lonDelta =
+    (lonB - lonA) * Math.cos(Cesium.Math.toRadians((latA + latB) / 2));
   return latDelta * latDelta + lonDelta * lonDelta;
 }
 
 function logSlowContext(startedAt, scope) {
   const durationMs = Math.round(performance.now() - startedAt);
   if (durationMs >= 500) {
-    console.info(`[GEV Voice] ${scope} scene context completed in ${durationMs}ms`);
+    console.info(
+      `[GEV Voice] ${scope} scene context completed in ${durationMs}ms`,
+    );
   }
 }
 
@@ -3173,23 +4503,30 @@ function summarizeEntity(viewer, entity, { includeProperties = false } = {}) {
   const tags = props.tags || {};
   const label = cleanText(
     props.name ||
-    tags.name ||
-    tags['name:en'] ||
-    tags.official_name ||
-    tags.operator ||
-    props.operator ||
-    entity.name ||
-    layerTitle(layerId)
+      tags.name ||
+      tags['name:en'] ||
+      tags.official_name ||
+      tags.operator ||
+      props.operator ||
+      entity.name ||
+      layerTitle(layerId),
   );
-  const position = entity.__localBaseCartesian || entity.position?.getValue?.(now) || polygonCenter(entity, now);
+  const position =
+    entity.__localBaseCartesian ||
+    entity.position?.getValue?.(now) ||
+    polygonCenter(entity, now);
   const carto = position ? Cesium.Cartographic.fromCartesian(position) : null;
   return {
     id: String(entity.id || ''),
     name: label || layerTitle(layerId),
     layerId,
     layerName: layerTitle(layerId),
-    latitude: carto ? Number(Cesium.Math.toDegrees(carto.latitude).toFixed(6)) : null,
-    longitude: carto ? Number(Cesium.Math.toDegrees(carto.longitude).toFixed(6)) : null,
+    latitude: carto
+      ? Number(Cesium.Math.toDegrees(carto.latitude).toFixed(6))
+      : null,
+    longitude: carto
+      ? Number(Cesium.Math.toDegrees(carto.longitude).toFixed(6))
+      : null,
     properties: includeProperties ? compactProperties(props) : undefined,
   };
 }
@@ -3197,13 +4534,17 @@ function summarizeEntity(viewer, entity, { includeProperties = false } = {}) {
 function summarizeContextRecord(record, { includeProperties = false } = {}) {
   return {
     id: String(record.id || ''),
-    name: cleanText(record.label || record.properties?.name) || layerTitle(record.layerId),
+    name:
+      cleanText(record.label || record.properties?.name) ||
+      layerTitle(record.layerId),
     layerId: record.layerId || null,
     layerName: record.layerName || layerTitle(record.layerId),
     source: record.source || null,
     latitude: record.latitude ?? null,
     longitude: record.longitude ?? null,
-    properties: includeProperties ? compactProperties(record.properties || {}) : undefined,
+    properties: includeProperties
+      ? compactProperties(record.properties || {})
+      : undefined,
     active: isContextRecordActive(record),
   };
 }
@@ -3225,9 +4566,10 @@ function unwrapProperties(value) {
   if (Array.isArray(value)) return value.map(unwrapProperties);
   const out = {};
   for (const [key, entry] of Object.entries(value)) {
-    out[key] = entry && typeof entry.getValue === 'function'
-      ? unwrapProperties(entry.getValue(Cesium.JulianDate.now()))
-      : unwrapProperties(entry);
+    out[key] =
+      entry && typeof entry.getValue === 'function'
+        ? unwrapProperties(entry.getValue(Cesium.JulianDate.now()))
+        : unwrapProperties(entry);
   }
   return out;
 }
@@ -3246,7 +4588,10 @@ function compactProperties(props) {
     'osm_id',
     'source',
   ];
-  const flat = { ...props, ...(props.tags && typeof props.tags === 'object' ? props.tags : {}) };
+  const flat = {
+    ...props,
+    ...(props.tags && typeof props.tags === 'object' ? props.tags : {}),
+  };
   const result = {};
   for (const key of preferredKeys) {
     const value = cleanText(flat[key]);
@@ -3290,11 +4635,6 @@ function clampNumber(value, min, max, fallback) {
  * the voice payload. One engine per runner keeps follow-up memory
  * ("which of those is closest?") scoped to the session.
  */
-/** layerId → epoch ms of last voice-driven enable (analyst warm-up honesty). */
-const _layerEnabledAt = new Map();
-let _analystEngine = null;
-/** Layers whose loaded set follows the camera, so a loaded count is not a world count. */
-const VIEWPORT_LOADED_LAYERS = new Set(['flights']);
 
 /**
  * The Contacts panel's own counts, or null when Contacts has no subject.
@@ -3302,27 +4642,99 @@ const VIEWPORT_LOADED_LAYERS = new Set(['flights']);
  * diverge no matter which surface asks.
  * @returns {object|null} Panel-equivalent window counts.
  */
-function activeContactsWindow() {
+function activeContactsWindow(dataManager) {
   try {
-    return contactsWindowFromSnapshot(militaryAwarenessLayer.getContextSnapshot?.());
+    const layer = dataManager?.layers?.get('military-awareness')?.module;
+    return (
+      layer?.contactsWindowFromSnapshot?.(layer.getContextSnapshot?.()) ?? null
+    );
   } catch {
     return null;
   }
 }
 
-function analystProviders(viewer, dataManager, { recordLimitByLayer = null } = {}) {
+/**
+ * Most records one layer hands a single query. Above every loaded feed seen
+ * so far (flights ~8k, vessels ~12k, a 24 h global FIRMS day ~160k), so
+ * answers count the whole loaded set; a feed past it reports
+ * returned/total/truncated rather than a silently short count.
+ */
+const ANALYST_RECORD_CAP = 250_000;
+/** A voice-enabled layer is still filling its first poll for this long. */
+const ANALYST_WARMUP_MS = 45_000;
+
+function layerIsWarming(enabledAt, layerKey) {
+  const at = enabledAt.get(layerKey);
+  return Boolean(at && Date.now() - at < ANALYST_WARMUP_MS);
+}
+
+function analystProviders(
+  viewer,
+  dataManager,
+  {
+    recordLimitByLayer = null,
+    placeSearch = unavailablePlaceSearch,
+    resolveRegionRing = (name) =>
+      defaultAnnotationResolver.resolveRegionRingForQuery(
+        name,
+        undefined,
+        placeSearch,
+      ),
+    isWarming = () => false,
+  } = {},
+) {
+  // Per-layer truncation seen by the last getRecords call.
+  const truncatedBy = new Map();
   return {
     getRecords(layerKey) {
+      truncatedBy.delete(layerKey);
       const layer = dataManager.layers.get(layerKey);
       if (!layer || !dataManager.isEnabled(layerKey)) return [];
       const mod = layer.module;
       if (typeof mod?.getAnalystRecords !== 'function') return [];
       const requestedLimit = recordLimitByLayer?.[layerKey];
-      return Number.isFinite(requestedLimit)
-        ? (mod.getAnalystRecords(requestedLimit) || [])
-        : (mod.getAnalystRecords() || []);
+      const cap = Number.isFinite(requestedLimit)
+        ? requestedLimit
+        : ANALYST_RECORD_CAP;
+      // One past the cap proves whether anything was left out.
+      const rows = mod.getAnalystRecords(Math.min(cap + 1, 2 ** 31)) || [];
+      if (rows.length > cap) {
+        truncatedBy.set(layerKey, true);
+        return rows.slice(0, cap);
+      }
+      return rows;
     },
-    resolveRegionRing: (name) => resolveRegionRingForQuery(name),
+    getLayerSnapshot(layerKey) {
+      const row = dataManager.getAll?.().find((layer) => layer.id === layerKey);
+      if (row) return layerSnapshot(row);
+      const module = dataManager.layers?.get(layerKey)?.module;
+      return layerSnapshot({
+        id: layerKey,
+        enabled: dataManager.isEnabled?.(layerKey),
+        stats: module?.getStats?.() || {},
+      });
+    },
+    getRecordCoverage(layerKey, rows) {
+      if (!truncatedBy.get(layerKey)) return { total: rows.length };
+      const loaded = dataManager.layers
+        .get(layerKey)
+        ?.module?.getStats?.().count;
+      return {
+        total: Number.isFinite(loaded) && loaded > rows.length ? loaded : null,
+        truncated: true,
+      };
+    },
+    isWarming,
+    /** The layer's own status text for an empty result, e.g. "Fly below 400 km". */
+    getEmptyNote(layerKey) {
+      const stats =
+        dataManager.layers.get(layerKey)?.module?.getStats?.() || {};
+      const note = [stats.coverage, stats.statusMessage].find(
+        (value) => typeof value === 'string' && value.trim(),
+      );
+      return note ? note.trim() : null;
+    },
+    resolveRegionRing,
     /**
      * The active Contacts subject, when there is one — the centre the operator
      * is reasoning about while Contacts is up. Null whenever Contacts is off,
@@ -3330,7 +4742,9 @@ function analystProviders(viewer, dataManager, { recordLimitByLayer = null } = {
      * @returns {{lat: number, lon: number, label: string|null}|null} Subject centre.
      */
     getContextSubject() {
-      const snapshot = militaryAwarenessLayer.getContextSnapshot?.();
+      const snapshot = dataManager?.layers
+        ?.get('military-awareness')
+        ?.module?.getContextSnapshot?.();
       const subject = snapshot?.subject;
       if (!subject?.position) return null;
       const carto = Cesium.Cartographic.fromCartesian(subject.position);
@@ -3356,66 +4770,195 @@ function analystProviders(viewer, dataManager, { recordLimitByLayer = null } = {
   };
 }
 
-async function runAnalystQuery(viewer, dataManager, args = {}) {
-  if (!_analystEngine) _analystEngine = createAnalystEngine(analystProviders(viewer, dataManager));
-  const result = await _analystEngine.query({
-    layers: Array.isArray(args.layers) ? args.layers : undefined,
-    scope: args.scope,
-    filters: Array.isArray(args.filters) ? args.filters : [],
-    sortBy: args.sortBy || null,
-    sortDir: args.sortDir,
-    limit: args.limit,
-    followUp: Boolean(args.followUp),
-  });
-  if (!result.ok) return { ok: false, action: 'analyst_query', error: result.error, coverage: result.coverage };
-  // Compact payload for the voice model: identity + the fields queries sort/
-  // filter on. The full record set stays engine-side for follow-ups.
-  //
-  // `icao24`/`mmsi` ride along because the tool instructions tell the model to
-  // hand this result straight to track_entity, and `id` is a DISPLAY label
-  // (callsign, else registration, else hex). A callsign-less contact therefore
-  // handed track_entity a tail number the lookup could not resolve, and the
-  // model burned the turn on retries (owner field session 2026-08-21, 23:48).
-  const items = result.items.map((r) => {
-    const compact = { layerKey: r.layerKey, id: r.id };
-    for (const k of ['icao24', 'mmsi', 'registration', 'label', 'callsign', 'name', 'altitudeM', 'speedMps', 'speedKts', 'frp', 'magnitude', 'shipType', 'destination', 'operator', 'routeOrigin', 'routeDestination', 'aircraftClass', 'military', 'onGround', 'distanceKm', 'confidence', 'place']) {
-      if (r[k] !== null && r[k] !== undefined) compact[k] = r[k];
-    }
-    return compact;
-  });
+/** Identity fields every compact analyst item keeps when present. */
+const ANALYST_IDENTITY_FIELDS = Object.freeze([
+  'icao24',
+  'mmsi',
+  'registration',
+  'label',
+  'callsign',
+  'name',
+  'noradId',
+]);
+
+/**
+ * Compact one analyst record for the voice payload: identity, position (so a
+ * follow-up can fly to it), distance, and that layer's manifest fields with
+ * times as ISO text. The full record set stays engine-side for follow-ups.
+ *
+ * `icao24`/`mmsi` ride along because the tool instructions tell the model to
+ * hand this result straight to track_entity, and `id` is a DISPLAY label
+ * (callsign, else registration, else hex). A callsign-less contact therefore
+ * handed track_entity a tail number the lookup could not resolve, and the
+ * model burned the turn on retries (owner field session 2026-08-21, 23:48).
+ * @param {object} r Engine record.
+ * @returns {object} Compact item.
+ */
+function compactAnalystItem(r) {
+  const compact = { layerKey: r.layerKey, id: r.id };
+  const present = (value) => value !== null && value !== undefined;
+  for (const key of ANALYST_IDENTITY_FIELDS)
+    if (present(r[key])) compact[key] = r[key];
+  if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
+    compact.lat = Math.round(r.lat * 1e4) / 1e4;
+    compact.lon = Math.round(r.lon * 1e4) / 1e4;
+  }
+  if (present(r.distanceKm)) compact.distanceKm = r.distanceKm;
+  const fields = voiceLayer(r.layerKey)?.query?.fields || {};
+  for (const [key, spec] of Object.entries(fields)) {
+    if (!present(r[key]) || key in compact) continue;
+    if (spec.type === 'time') {
+      const ms = Number(r[key]);
+      if (Number.isFinite(ms)) compact.time = new Date(ms).toISOString();
+    } else compact[key] = r[key];
+  }
+  if (present(r.ageHours)) compact.ageHours = r.ageHours;
+  return compact;
+}
+
+/** Refusal fields the analyst engine owns and the model must receive. */
+const ANALYST_REFUSAL_FIELDS = Object.freeze([
+  'allowed',
+  'field',
+  'expected',
+  'layers',
+  'layerStatus',
+  'cancelled',
+]);
+
+const VIEWPORT_COVERAGE_NOTE = 'the flights layer loads by viewport';
+
+/** Resolve omitted follow-up scope from the engine's retained coverage. */
+function effectiveAnalystScopeKind(args, coverage) {
+  const explicit = String(args.scope?.kind || '').toLowerCase();
+  if (explicit) return explicit;
+  const retained = String(coverage?.scope || '')
+    .split(':', 1)[0]
+    .toLowerCase();
+  if (retained === 'window') return 'radius';
+  if (['anywhere', 'radius', 'region', 'view'].includes(retained))
+    return retained;
+  return args.followUp ? 'anywhere' : 'view';
+}
+
+/** Add the viewport qualification without replacing retained provenance. */
+function withViewportCoverageNote(coverage) {
+  if (!coverage) return coverage;
+  const current = typeof coverage.note === 'string' ? coverage.note : '';
+  if (current.includes(VIEWPORT_COVERAGE_NOTE)) return coverage;
+  const separator = current ? '; ' : '';
+  return {
+    ...coverage,
+    note: current
+      ? `${current}${separator}${VIEWPORT_COVERAGE_NOTE}`
+      : VIEWPORT_COVERAGE_NOTE,
+  };
+}
+
+/** Whether this query counts records from a viewport-loaded layer. */
+function isViewportScopedAnalystResult(args, coverage) {
+  const scopeKind = effectiveAnalystScopeKind(args, coverage);
+  return (
+    (scopeKind === 'radius' || scopeKind === 'view') &&
+    (coverage?.layersQueried || []).some(
+      (layer) => voiceLayer(layer.layerKey)?.query?.viewportLoaded,
+    )
+  );
+}
+
+async function runAnalystQuery(
+  analystEngine,
+  dataManager,
+  args = {},
+  _layerEnabledAt,
+  isCurrent = () => true,
+  signal = undefined,
+) {
+  let entityWindow = null;
+  const result = await analystEngine.query(
+    {
+      layers: Array.isArray(args.layers) ? args.layers : undefined,
+      scope: args.scope,
+      filters: Array.isArray(args.filters) ? args.filters : [],
+      sortBy: args.sortBy || null,
+      sortDir: args.sortDir,
+      limit: args.limit,
+      followUp: Boolean(args.followUp),
+    },
+    {
+      isCurrent,
+      signal,
+      beforeCommit: async (candidate) => {
+        const projected = await aircraftProximityWindowForQuery(
+          dataManager,
+          args,
+          candidate,
+          isCurrent,
+        );
+        if (
+          projected?.answer &&
+          projected?.memory &&
+          isViewportScopedAnalystResult(args, projected.answer.coverage)
+        ) {
+          const coverage = withViewportCoverageNote(projected.answer.coverage);
+          projected.answer.coverage = coverage;
+          projected.memory.coverage = coverage;
+        }
+        entityWindow = projected?.answer || null;
+        return projected?.memory || null;
+      },
+    },
+  );
+  if (!result.ok) {
+    const refusal = {
+      ok: false,
+      action: 'analyst_query',
+      code: result.code || null,
+      error: result.error,
+    };
+    // The engine's semantic fields pass through unchanged: a cancellation
+    // stays a cancellation.
+    for (const key of ANALYST_REFUSAL_FIELDS)
+      if (result[key] !== undefined) refusal[key] = result[key];
+    if (result.coverage) refusal.coverage = result.coverage;
+    return refusal;
+  }
+  const items = result.items.map(compactAnalystItem);
   // Warm-up honesty: a layer enabled seconds ago hasn't finished its first
-  // poll (entity layers render one interval behind live BY DESIGN) — tell the
-  // model so a low count is narrated as "still loading", not as fact.
+  // poll (entity layers render one interval behind live BY DESIGN) — so a low
+  // count is "still loading", not fact.
   const warming = (result.coverage?.layersQueried || [])
-    .filter((l) => {
-      const at = _layerEnabledAt.get(l.layerKey);
-      return at && (Date.now() - at) < 45_000;
-    })
+    .filter((l) => layerIsWarming(_layerEnabledAt, l.layerKey))
     .map((l) => l.layerKey);
   if (warming.length) {
-    result.coverage.warmup = `${warming.join(', ')} enabled moments ago — data is still loading; counts will rise for ~30-45s. Say so.`;
+    const note = `${warming.join(', ')} just turned on — still loading, counts will rise`;
+    result.display.caveat = result.display.caveat
+      ? `${note}; ${result.display.caveat}`
+      : note;
   }
   // A radius/view count over a viewport-loaded layer counts what is LOADED, and
   // the flights layer reloads as the camera moves — so this number can sit well
-  // under the Contacts cohort without either being wrong. Say which is which.
-  const scopeKind = String(args.scope?.kind || 'view').toLowerCase();
-  const viewportScoped = (scopeKind === 'radius' || scopeKind === 'view')
-    && (result.coverage?.layersQueried || [])
-      .some((l) => VIEWPORT_LOADED_LAYERS.has(l.layerKey));
+  // under the Contacts cohort without either being wrong.
+  const scopeKind = effectiveAnalystScopeKind(args, result.coverage);
+  const viewportScoped = isViewportScopedAnalystResult(args, result.coverage);
   if (viewportScoped && result.coverage) {
-    result.coverage.note = `${result.coverage.note} — counts cover loaded data; the flights layer loads by viewport`;
+    // The engine's follow-up memory retains this same object, so update its
+    // note in place after deriving the qualified copy.
+    result.coverage.note = withViewportCoverageNote(result.coverage).note;
   }
   // ENTITY-CENTRED NEARBY: answered by the SAME engine that fills the Contacts
   // panel, so the spoken number and the panel readout for one centre cannot
   // differ. The generic record/scope engine still owns explicit regions and
   // arbitrary points — only "how many aircraft around <this contact>" is
   // unified, because that is the question the panel is already answering.
-  const entityWindow = aircraftProximityWindowForQuery(args, result);
-  if (entityWindow) return entityWindow;
+  if (entityWindow) {
+    return entityWindow;
+  }
 
-  const contactsWindow = activeContactsWindow();
-  const aircraftQueried = (result.coverage?.layersQueried || [])
-    .some((l) => l.layerKey === 'flights' || l.layerKey === 'military');
+  const contactsWindow = activeContactsWindow(dataManager);
+  const aircraftQueried = (result.coverage?.layersQueried || []).some(
+    (l) => l.layerKey === 'flights' || l.layerKey === 'military',
+  );
   // Both numbers, and which one answers the question. The window counts have
   // ridden along in `contactsWindow` for a while, and the owner's trial showed
   // that is not enough on its own: with Contacts active and a DATACENTER in
@@ -3424,35 +4967,52 @@ async function runAnalystQuery(viewer, dataManager, args = {}) {
   // number is from the Contacts window, and I wasn't using Contacts as the
   // source"). So the payload now states the relationship instead of leaving it
   // to be inferred from two bare numbers.
-  const windowAircraft = Number.isFinite(contactsWindow?.aircraft) ? contactsWindow.aircraft : null;
-  const proximityScoped = scopeKind === 'radius' || scopeKind === 'view';
-  const countsReconciliation = (contactsWindow && aircraftQueried && proximityScoped && windowAircraft !== null)
-    ? `Contacts is ACTIVE: its window holds ${windowAircraft} aircraft within `
-      + `${contactsWindow.radiusKm} km of ${contactsWindow.centeredOn}, and that is the answer to a bare `
-      + `"how many aircraft are nearby". This query measured something else — ${result.count} ${result.scopeLabel}. `
-      + 'Give this one only if the operator asked about that specific area, and name both scopes if you give both.'
+  const windowAircraft = Number.isFinite(contactsWindow?.aircraft)
+    ? contactsWindow.aircraft
     : null;
+  const proximityScoped = scopeKind === 'radius' || scopeKind === 'view';
+  const countsReconciliation =
+    contactsWindow &&
+    aircraftQueried &&
+    proximityScoped &&
+    windowAircraft !== null
+      ? `Contacts is ACTIVE: its window holds ${windowAircraft} aircraft within ` +
+        `${contactsWindow.radiusKm} km of ${contactsWindow.centeredOn}, and that is the answer to a bare ` +
+        `"how many aircraft are nearby". This query measured something else — ${result.count} ${result.scopeLabel}. ` +
+        'Give this one only if the operator asked about that specific area, and name both scopes if you give both.'
+      : null;
   return {
     ok: true,
     action: 'analyst_query',
     count: result.count,
+    // False when a layer was capped: the count is a floor ("at least").
+    complete: result.complete !== false,
+    ...(result.partial
+      ? { partial: true, unanswered: result.unanswered || [] }
+      : {}),
+    ...(result.centeredOn ? { centeredOn: result.centeredOn } : {}),
     // Every count names its scope in words; a bare number is what made two
     // honest answers look like a contradiction.
     scopeLabel: result.scopeLabel,
-    truncated: result.truncated,
+    // More matched than listed; the count above is still complete.
+    listed: items.length,
     items,
     summary: result.summary,
+    // On-screen detail (scope, feed window, caveats); not for recital.
+    display: result.display,
     coverage: result.coverage,
+    feedProvenance: result.coverage?.feedProvenance || null,
+    feedState: result.coverage?.feedProvenance?.overall || null,
     // The panel's own numbers, carried so the answer can match what the
     // operator is looking at regardless of how the model reads the note.
     // Flattened alongside the object so the count and its subject cannot be
     // missed inside a nested shape.
     ...(contactsWindow && aircraftQueried
       ? {
-        contactsWindow,
-        contactsWindowCount: windowAircraft,
-        contactsWindowSubject: contactsWindow.centeredOn || null,
-      }
+          contactsWindow,
+          contactsWindowCount: windowAircraft,
+          contactsWindowSubject: contactsWindow.centeredOn || null,
+        }
       : {}),
     ...(countsReconciliation ? { countsReconciliation } : {}),
   };

@@ -9,7 +9,7 @@
 
 ### A real-time geospatial intelligence console for planet Earth.
 
-Photorealistic 3D globe, live aircraft, global maritime vessels, orbital satellites, seismic monitors, wildfire sensors, and public photographic CCTV feeds. Powered by a hands-free realtime AI agent. Available for modern web browsers and Android devices.
+Photorealistic 3D globe, live aircraft, global maritime vessels, orbital satellites, seismic monitors, wildfire sensors, public photographic CCTV feeds, and street-level 360° panoramas. Powered by a hands-free realtime AI agent. Available for modern web browsers and Android devices.
 ### "Special Thanks to @bilawalsidhu"
 
 *No place left behind.*  
@@ -20,7 +20,7 @@ Try other Apps: *https://worldpixelmap.in/apps_suite/*
 [![Cesium](https://img.shields.io/badge/Engine-CesiumJS%203D-blue.svg)](https://cesium.com/)
 [![Unit Tests](https://img.shields.io/badge/Unit%20Tests-2680%2B%20Passing-brightgreen.svg)](scripts/run-unit-tests.mjs)
 [![License Server](https://img.shields.io/badge/License%20Server-Titan%20Active-brightgreen.svg)](https://worldpixelmap.in/apps_suite/portal.php)
-[![Release](https://img.shields.io/badge/Release-v1.0.3-orange.svg)](https://github.com/WorldPixelMap/android-gods-eye-view/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.4-orange.svg)](https://github.com/WorldPixelMap/android-gods-eye-view/releases)
 
 ---
 
@@ -32,7 +32,7 @@ Try other Apps: *https://worldpixelmap.in/apps_suite/*
 
 ## 🌍 Overview
 
-**God's Eye View** fuses disparate real-time open signals into a single unified 3D operational picture. From transponder state vectors in the upper atmosphere to AIS vessel beacons crossing oceans, orbital satellite ephemerides, active wildfire perimeters, and live municipal street cameras — the entire planet is modeled in high-fidelity 3D with zero lag.
+**God's Eye View** fuses disparate real-time open signals into a single unified 3D operational picture. From transponder state vectors in the upper atmosphere to AIS vessel beacons crossing oceans, orbital satellite ephemerides, active wildfire perimeters, municipal street surveillance cameras, and ground-level street panoramas — the entire planet is modeled in high-fidelity 3D with zero lag.
 
 > Built with **CesiumJS**, **Google Photorealistic 3D Tiles**, and **OpenAI Realtime Voice**, God's Eye View delivers the visual language of an advanced intelligence operations center.
 
@@ -41,15 +41,18 @@ Try other Apps: *https://worldpixelmap.in/apps_suite/*
 ## 🎛️ Key Features
 
 - **🌐 Photorealistic 3D Globe:** High-resolution 3D photogrammetry and terrain meshes rendered via Google 3D Tiles and CesiumJS.
+- **🖥️ Instant Browser Fullscreen & F11 Emulation:** One-click toggle in the top toolbar to switch into an immersive, distraction-free desktop kiosk view via HTML5 Fullscreen API with synthetic F11 dispatch fallback.
 - **✈️ Live Flight Tracking & Cockpit Mode:** Track thousands of commercial and military aircraft in real time. Jump into the cockpit of any tracked flight with real-world orientation and terrain-following cameras.
 - **🚢 Global Marine Navigation (AIS):** Track commercial shipping lanes, tankers, cargo vessels, and tugs worldwide with live course projection.
 - **🛰️ Orbital Satellites & Space Missions:** Propagate real-time SGP4 orbits for the ISS, Starlink constellations, and weather satellites with orbital footprint projections and launch schedules.
-- **📹 Live Photographic CCTV Engine:** Connects to real-world municipal camera networks across London (TfL JamCams), San Francisco & Bay Area (Caltrans D4), and Austin Mobility with estimated camera viewsheds.
+- **📹 Live Tactical CCTV & HLS Video Feeds:** Connects to municipal camera networks across London (TfL JamCams), San Francisco & California Bay Area (Caltrans D4), Austin Mobility, Transport for NSW (Sydney), Calgary Traffic, Warendorf (NRW), and Tallinn (Estonia) with live HLS streaming video and photographic snapshot feeds.
+- **🧭 Docked Tactical Rail & Unified Controls:** Permanently docked right-rail cards for **CCTV**, **DISPLAY**, **DATA LAYERS**, and **STREET LEVEL** with standardized 176px × 50px collapsed footprint, centered typography, and custom cyber-scrollbars allowing smooth vertical scrolling when expanded.
+- **👁️ Street-Level 360° Panoramas:** Seamless transition from global 3D orbital perspective to ground-level street imagery integrated with Mapillary and photographic captures.
 - **🚗 Speed-Calibrated Traffic Simulation:** Realistic street-level traffic vector flow integrated with OpenStreetMap geometry.
 - **🎨 Multi-Sensor Optics (GLSL Shaders):** Cycle through Night Vision (NVG), Forward Looking Infrared (FLIR Ironbow), CRT, Noir, and Snow sensor filters in real time.
 - **🎖️ Tactical Military HUD:** Clean, non-colliding military HUD displaying MGRS coordinates, geodetic lat/lon, satellite identification, NIIRS scale, and AI scene summaries.
 - **🎙️ Realtime AI Voice Co-Pilot:** Natural spoken interaction to fly camera routes, query visible objects, inspect telemetry, measure distances, and manage layers hands-free.
-- **🔒 Hardware-Bound Titan Licensing:** Built-in tamper-proof device fingerprinting, 7-day zero-friction evaluation, cryptographic epoch countdown, and online license validation.
+- **🔒 Hardware-Bound Titan Licensing:** Built-in tamper-proof device fingerprinting, 7-day zero-friction evaluation, cryptographic epoch countdown, non-overlapping floating notifications, and online VIP license validation.
 
 ---
 
@@ -63,6 +66,7 @@ God's Eye View incorporates an enterprise-grade, hardware-bound licensing archit
 - **Tamper-Resistant Offline Epoch Countdown:** The trial expiration is anchored to a cryptographic epoch timestamp (`titan_hw_epoch`). If the system clock is manipulated backward, the built-in anti-clock rollback guard automatically revokes the trial.
 - **One-Click License Activation:** Seamlessly upgrade from trial to full VIP access by entering an activation key in the in-app license manager dialog.
 - **License Management Dialog (`Ctrl + L`):** Displays real-time device ID, current license tier (Trial, Active VIP, or Expired), remaining days, and instant unbind/rebind options.
+- **Unobtrusive Floating Notification:** Carefully positioned trial status badge (`top: 78px`) prevents any overlap with top action controls or titles.
 
 ### License Endpoints & Store Links:
 - **🛒 Product Store:** [Purchase a License Key](https://worldpixelmap.in/apps_suite/product.php?slug=agev)
@@ -74,6 +78,7 @@ God's Eye View incorporates an enterprise-grade, hardware-bound licensing archit
 
 | Key / Shortcut | Action | Description |
 |---|---|---|
+| **`F11`** / **Fullscreen Icon** | **Toggle Fullscreen View** | Toggles full-screen desktop view with zero browser borders or address bars. |
 | **`1`** | **Standard Optics** | True-color satellite imagery and 3D photogrammetric tiles. |
 | **`2`** | **Night Vision (NVG)** | Phosphor-green light amplification shader with scanning lines. |
 | **`3`** | **FLIR Thermal (Ironbow)** | Long-wave infrared false-color thermal heat signature spectrum. |
@@ -92,28 +97,29 @@ God's Eye View incorporates an enterprise-grade, hardware-bound licensing archit
 
 ## 📱 Android App & Release APK
 
-God's Eye View includes a native Android wrapper optimized for landscape tablets and smartphones, utilizing hardware-accelerated WebView rendering and low-latency touch controls.
+God's Eye View includes a native Android wrapper optimized for landscape tablets and smartphones, utilizing hardware-accelerated WebView rendering, low-latency touch gestures, and native lifecycle hooks.
 
-### Pre-Built Signed Release APK
-The pre-compiled, signed Android APK is ready for deployment:
-- **Direct Path:** [`Android/app/build/outputs/apk/release/app-release.apk`](Android/app/build/outputs/apk/release/) or the root [`gods-eye-view-release.apk`](gods-eye-view-release.apk)
+### Release APK Details (v1.0.4)
+- **Target SDK:** Android 14 (API 34)
+- **Min SDK:** Android 8.0 Oreo (API 26)
+- **Architectures:** `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`
 - **Releases:** Download directly from [GitHub Releases](https://github.com/WorldPixelMap/android-gods-eye-view/releases).
 
-### Building from Source (Android Studio / Gradle):
+### Building from Source (Android Studio / Gradle CLI):
 
-1. **Build & Sync Web Assets:**
+1. **Build & Bundle Production Web Assets:**
    ```bash
    node Android/scripts/build-apk-assets.mjs
    ```
 
-2. **Assemble Release APK:**
+2. **Assemble Clean Release APK:**
    ```bash
    cd Android
-   ./gradlew assembleRelease
+   ./gradlew clean assembleRelease
    ```
-   *The signed APK will be generated at `Android/app/build/outputs/apk/release/app-release.apk`.*
+   *The signed APK will be output to `Android/app/build/outputs/apk/release/app-release.apk`.*
 
-3. **Install on Connected Device via ADB:**
+3. **Install on Connected Android Device via ADB:**
    ```bash
    adb install -r Android/app/build/outputs/apk/release/app-release.apk
    adb shell am start -n com.worldpixelmap.gev/.MainActivity
@@ -148,7 +154,7 @@ The pre-compiled, signed Android APK is ready for deployment:
    ```
 
 4. **Launch:**
-   Open **`http://localhost:4173`** in your browser.
+   Open **`http://localhost:4173`** in your browser. Use the fullscreen button on the top toolbar to toggle kiosk view.
 
 ---
 
@@ -172,7 +178,8 @@ The integrated voice agent is powered by OpenAI's Realtime WebSocket protocol, p
 | 🚢 **Live Vessels (AIS)** | AISStream.io | 🟡 Free API Key | Global maritime vessel positions, ship types, and destinations. |
 | 🛰️ **Satellites (TLE)** | CelesTrak / Space-Track | 🟢 100% Free | SGP4 orbital propagation for Starlink, ISS, GPS, and scientific satellites. |
 | 🚀 **Space Missions** | Launch Library 2 | 🟢 100% Free | Upcoming rocket launches, launch complexes, and mission telemetry. |
-| 📹 **City CCTV Feeds** | TfL / Caltrans / Austin Open Data | 🟢 100% Free | Live photographic snapshot camera feeds projected into 3D space. |
+| 📹 **City CCTV Feeds** | TfL / Caltrans / Austin / NSW / Calgary | 🟢 100% Free | Live photographic snapshot & HLS video streams projected in 3D. |
+| 👁️ **Street-Level Panoramas** | Mapillary / OpenStreetCam | 🟢 100% Free | 360-degree ground-level photographic panoramas with directional compass. |
 | 🌦️ **Global Weather** | Open-Meteo | 🟢 100% Free | High-resolution cloud cover, temperature, and atmospheric forecasts. |
 | 🌍 **Earthquakes** | USGS Hazard Program | 🟢 100% Free | Real-time global seismic event epicenter and magnitude telemetry. |
 | 🔥 **Wildfires** | NASA FIRMS (VIIRS/MODIS) | 🟡 Free API Key | Satellite thermal anomaly detection identifying active wildfire zones. |
@@ -224,12 +231,20 @@ android-gods-eye-view/
 │   └── models/                 # Optimized glTF aircraft, satellite, and ship models
 ├── scripts/                    # Build, test, attribution, and QA tooling
 │   └── run-unit-tests.mjs      # Test discovery and execution engine
-├── src/                        # Core application source code
+├── server/                     # Modular backend API proxy & feed providers
+│   ├── mcp/                    # Model Context Protocol services
+│   ├── providers/              # CCTV, aircraft, AIS, satellite, weather providers
+│   └── standalone/             # Standalone proxy configurations
+├── src/                        # Core client application source code
 │   ├── annotations/            # Whiteboard drawing, containment, and measurement
 │   ├── audio/                  # Spatial sound effects and radio streaming
 │   ├── data/                   # Live telemetry ingest (ADS-B, AIS, TLE, CCTV, FIRMS)
 │   ├── hud/                    # Military HUD, MGRS grid, and compass overlay
 │   ├── overlays/               # Tactical optics shaders (NVG, FLIR, CRT)
+│   ├── ui/                     # Modular UI components, docks, rails, and styles
+│   │   ├── styles/             # Modular CSS stylesheets (controls, layers, status)
+│   │   ├── applicationShell.js # Top actions, fullscreen toggle & HUD controllers
+│   │   └── panelPositionControls.js # Docked rail menus & layout controllers
 │   ├── voice/                  # OpenAI Realtime WebSocket protocol client
 │   ├── license.js              # Hardware-bound Titan license client
 │   ├── licenseModal.js         # Titan license in-app management dialog

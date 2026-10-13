@@ -4,12 +4,16 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { projectRoot } from './project-root.mjs';
 import { selectMapStartupRoute } from '../src/mapStartup.js';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = projectRoot(import.meta.url);
+const OPENSKY_AUTH_MODE_DEFAULT = 'oauth';
+const OPENSKY_AUTH_MODES = new Set(['basic', 'oauth', 'auto', 'anon']);
 
 export const CREDENTIALS = Object.freeze([
   { name: 'GOOGLE_MAPS_API_KEY', label: 'Google Maps', keychain: [['google-maps-api', 'api-key'], ['google-maps-api', 'default'], ['google-maps-api', 'key']] },
+  { name: 'GOOGLE_MAPS_SERVER_API_KEY', label: 'Google Places / Street View server', keychain: [] },
   { name: 'CESIUM_ION_TOKEN', label: 'Cesium ion', keychain: [['cesium-ion', 'token']] },
   { name: 'OPENAI_API_KEY', label: 'OpenAI voice', keychain: [['openai-api', 'api-key']] },
   { name: 'AISSTREAM_API_KEY', label: 'AISStream vessels', keychain: [['aisstream-api', 'api-key']] },
@@ -30,6 +34,7 @@ export const CREDENTIALS = Object.freeze([
     )),
   },
   { name: 'LL2_API_TOKEN', label: 'Launch Library 2', keychain: [] },
+  { name: 'MAPILLARY_CLIENT_TOKEN', label: 'Mapillary street level', keychain: [['mapillary', 'client-token'], ['mapillary', 'token']] },
 ]);
 
 export function isConfiguredValue(value) {
@@ -99,6 +104,21 @@ export function readDoctorDotenvValue(
   return String(values[key] ?? '');
 }
 
+/** Resolve the OpenSky auth mode using the same environment and dotenv precedence as the launcher. */
+export function resolveOpenSkyAuthMode({
+  authoritativeEnvironment = false,
+  environment = process.env,
+  rootDir = ROOT,
+} = {}) {
+  const environmentDefinesMode = Object.prototype.hasOwnProperty.call(environment, 'OPENSKY_AUTH_MODE');
+  const environmentMode = String(environment.OPENSKY_AUTH_MODE || '').trim();
+  const dotenvMode = authoritativeEnvironment && environmentDefinesMode
+    ? ''
+    : readDoctorDotenvValue('OPENSKY_AUTH_MODE', rootDir);
+  const mode = (environmentMode || dotenvMode).trim().toLowerCase();
+  return OPENSKY_AUTH_MODES.has(mode) ? mode : OPENSKY_AUTH_MODE_DEFAULT;
+}
+
 function hasKeychainItem(service, account) {
   if (process.platform !== 'darwin') return false;
   const result = spawnSync('security', [
@@ -126,8 +146,25 @@ export function resolveCredential(spec, {
   return { configured: false, source: null };
 }
 
-export function buildCapabilitySummary(credentials) {
+export function buildCapabilitySummary(
+  credentials,
+  { openSkyAuthMode = OPENSKY_AUTH_MODE_DEFAULT } = {},
+) {
   const configured = (name) => credentials[name]?.configured === true;
+  const hasOAuthCredentials = configured('OPENSKY_CLIENT_ID') && configured('OPENSKY_CLIENT_SECRET');
+  const requestedOpenSkyMode = String(openSkyAuthMode || '').trim().toLowerCase();
+  const openSkyMode = OPENSKY_AUTH_MODES.has(requestedOpenSkyMode)
+    ? requestedOpenSkyMode
+    : OPENSKY_AUTH_MODE_DEFAULT;
+  const flights = openSkyMode === 'anon'
+    ? 'OpenSky keyless anonymous access (rate-limited)'
+    : openSkyMode === 'basic'
+      ? 'OpenSky Basic mode selected (credential presence and validity not verified)'
+      : openSkyMode === 'auto'
+        ? 'OpenSky auto mode selected (runtime credential choice and validity not verified)'
+        : hasOAuthCredentials
+          ? 'OpenSky OAuth credentials present (runtime mode and validity not verified)'
+          : 'OpenSky keyless anonymous access (rate-limited)';
   const route = selectMapStartupRoute({
     googleApiKey: configured('GOOGLE_MAPS_API_KEY') ? 'configured' : '',
     cesiumToken: configured('CESIUM_ION_TOKEN') ? 'configured' : '',
@@ -138,10 +175,10 @@ export function buildCapabilitySummary(credentials) {
       : route === 'google-ion'
         ? 'Google Photorealistic 3D Tiles through Cesium ion; Bing and world-terrain stacks available'
         : 'Esri World Imagery (keyless satellite basemap) with keyless terrain',
-    flights: configured('OPENSKY_CLIENT_ID') && configured('OPENSKY_CLIENT_SECRET')
-      ? 'OpenSky OAuth credentials present (runtime mode and validity not verified)'
-      : 'OpenSky OAuth credentials not configured',
-    voice: configured('OPENAI_API_KEY') ? 'available' : 'off until an OpenAI key is added',
+    flights,
+    voice: configured('OPENAI_API_KEY')
+      ? 'available'
+      : 'off until an OpenAI key is added, or a Codex ChatGPT sign-in is selected in Provider Settings (experimental)',
     vessels: configured('AISSTREAM_API_KEY') ? 'live AISStream feed' : 'off until an AISStream key is added',
     fires: configured('FIRMS_MAP_KEY') ? 'live NASA FIRMS feed' : 'off until a FIRMS key is added',
     traffic: configured('TOMTOM_API_KEY') ? 'live TomTom flow' : 'built-in traffic simulation',
@@ -151,7 +188,7 @@ export function buildCapabilitySummary(credentials) {
   };
 }
 
-export function inspectSetup({ includeKeychain = true, authoritativeEnvironment = false } = {}) {
+export function inspectSetup({ includeKeychain = true, authoritativeEnvironment = false, rootDir = ROOT } = {}) {
   const node = classifyNodeVersion();
   const npm = npmProcessSpec();
   const npmResult = spawnSync(npm.command, ['--version'], {
@@ -160,9 +197,9 @@ export function inspectSetup({ includeKeychain = true, authoritativeEnvironment 
   });
   const credentials = Object.fromEntries(CREDENTIALS.map((spec) => [
     spec.name,
-    resolveCredential(spec, { includeKeychain, authoritativeEnvironment }),
+    resolveCredential(spec, { includeKeychain, authoritativeEnvironment, rootDir }),
   ]));
-  const dependenciesInstalled = hasRequiredDependencies();
+  const dependenciesInstalled = hasRequiredDependencies(rootDir);
   return {
     ready: node.level !== 'error' && npmResult.status === 0 && dependenciesInstalled,
     node: { version: process.versions.node, ...node },
@@ -171,7 +208,9 @@ export function inspectSetup({ includeKeychain = true, authoritativeEnvironment 
       : { available: false, version: null },
     dependenciesInstalled,
     credentials,
-    capabilities: buildCapabilitySummary(credentials),
+    capabilities: buildCapabilitySummary(credentials, {
+      openSkyAuthMode: resolveOpenSkyAuthMode({ authoritativeEnvironment, rootDir }),
+    }),
   };
 }
 
