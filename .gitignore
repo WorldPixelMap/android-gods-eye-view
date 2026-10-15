@@ -31,7 +31,6 @@ local.properties
 # Android build outputs & IDE caches
 .gradle/
 .idea/
-build/
 Android/.gradle/
 Android/.idea/
 Android/build/
