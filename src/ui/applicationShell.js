@@ -1512,9 +1512,9 @@ export class StyleManager extends ShellFacade {
     const updateIcon = () => {
       const isFs = Boolean(
         document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement,
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement,
       );
       const icon = this._fullscreenBtn.querySelector(
         '.material-symbols-outlined',
@@ -1537,9 +1537,9 @@ export class StyleManager extends ShellFacade {
       try {
         const isFs = Boolean(
           document.fullscreenElement ||
-            document.webkitFullscreenElement ||
-            document.mozFullScreenElement ||
-            document.msFullscreenElement,
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement,
         );
         if (isFs) {
           const exit =

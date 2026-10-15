@@ -266,7 +266,8 @@
     width: 100%;
   }
 
-  #right-context-rail:has(> [data-panel-id]:not(.collapsed)) > [data-panel-id].collapsed:not(.panel-floating) {
+  #right-context-rail:has(> [data-panel-id]:not(.collapsed))
+    > [data-panel-id].collapsed:not(.panel-floating) {
     display: none !important;
   }
 
@@ -436,7 +437,9 @@
 
   #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar,
   #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar,
-  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar,
+  #right-context-rail
+    #cctv-panel:not(.collapsed)
+    .cctv-panel-inner::-webkit-scrollbar,
   #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar,
   #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar,
   #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar {
@@ -444,8 +447,11 @@
   }
 
   #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-track,
-  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-track,
-  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track,
+  #right-context-rail
+    > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-track,
+  #right-context-rail
+    #cctv-panel:not(.collapsed)
+    .cctv-panel-inner::-webkit-scrollbar-track,
   #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar-track,
   #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar-track,
   #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track {
@@ -454,8 +460,11 @@
   }
 
   #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb,
-  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb,
-  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb,
+  #right-context-rail
+    > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb,
+  #right-context-rail
+    #cctv-panel:not(.collapsed)
+    .cctv-panel-inner::-webkit-scrollbar-thumb,
   #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb,
   #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb,
   #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb {
@@ -467,11 +476,17 @@
     border-radius: 999px !important;
   }
 
-  #left-panel-stack > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb:hover,
-  #right-context-rail > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb:hover,
-  #right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover,
-  #right-context-rail > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover,
-  #right-context-rail #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #left-panel-stack
+    > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #right-context-rail
+    > [data-panel-id]:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #right-context-rail
+    #cctv-panel:not(.collapsed)
+    .cctv-panel-inner::-webkit-scrollbar-thumb:hover,
+  #right-context-rail
+    > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover,
+  #right-context-rail
+    #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover,
   #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(
       180deg,

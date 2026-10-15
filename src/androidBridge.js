@@ -25,7 +25,8 @@ export const KEY_SPECS = {
     category: 'Map & 3D Globe',
     required: false,
     freeQuota: '1,000 free 3-hour sessions per month',
-    description: 'Powers high-resolution photorealistic 3D cities and global 3D tile geometry.',
+    description:
+      'Powers high-resolution photorealistic 3D cities and global 3D tile geometry.',
     fallback: 'OpenStreetMap + Re:Earth 3D Terrain (100% Free & Keyless)',
     signupUrl: 'https://console.cloud.google.com/google/maps-apis/credentials',
     guideSteps: [
@@ -42,8 +43,10 @@ export const KEY_SPECS = {
     category: 'AI & Voice Agent',
     required: false,
     freeQuota: 'Pay-per-usage (cents/minute on gpt-realtime-mini)',
-    description: 'Enables hands-free conversational voice commands (GEV MIC) and real-time visual scene analysis.',
-    fallback: 'Voice is disabled; full tactical touch/mouse HUD navigation remains 100% functional.',
+    description:
+      'Enables hands-free conversational voice commands (GEV MIC) and real-time visual scene analysis.',
+    fallback:
+      'Voice is disabled; full tactical touch/mouse HUD navigation remains 100% functional.',
     signupUrl: 'https://platform.openai.com/api-keys',
     guideSteps: [
       'Log into platform.openai.com with your OpenAI account.',
@@ -58,7 +61,8 @@ export const KEY_SPECS = {
     category: 'Live Telemetry',
     required: false,
     freeQuota: '100% Free instant developer key',
-    description: 'Streams real-time worldwide cargo, tanker, passenger, and maritime ship telemetry via WebSocket.',
+    description:
+      'Streams real-time worldwide cargo, tanker, passenger, and maritime ship telemetry via WebSocket.',
     fallback: 'Vessels layer is inactive when key is missing.',
     signupUrl: 'https://aisstream.io/',
     guideSteps: [
@@ -73,7 +77,8 @@ export const KEY_SPECS = {
     category: 'Live Telemetry',
     required: false,
     freeQuota: '100% Free key from NASA EOSDIS',
-    description: 'Displays active thermal anomalies and global wildfires from VIIRS & MODIS satellite sensors.',
+    description:
+      'Displays active thermal anomalies and global wildfires from VIIRS & MODIS satellite sensors.',
     fallback: 'Fires layer is inactive when key is missing.',
     signupUrl: 'https://firms.modaps.eosdis.nasa.gov/api/map_key/',
     guideSteps: [
@@ -88,8 +93,10 @@ export const KEY_SPECS = {
     category: 'Live Telemetry',
     required: false,
     freeQuota: 'Free tier (~50,000 tile requests/day)',
-    description: 'Colors street-level traffic according to live rush-hour jams and vehicular speeds.',
-    fallback: 'Built-in animated traffic simulation (white dots with standard road-speed flow).',
+    description:
+      'Colors street-level traffic according to live rush-hour jams and vehicular speeds.',
+    fallback:
+      'Built-in animated traffic simulation (white dots with standard road-speed flow).',
     signupUrl: 'https://developer.tomtom.com/',
     guideSteps: [
       'Sign up for a free account at developer.tomtom.com.',
@@ -102,7 +109,8 @@ export const KEY_SPECS = {
     category: 'Map & 3D Globe',
     required: false,
     freeQuota: '100% Free personal community tier',
-    description: 'Enables Bing Aerial satellite imagery and Cesium World Terrain elevation data.',
+    description:
+      'Enables Bing Aerial satellite imagery and Cesium World Terrain elevation data.',
     fallback: 'Re:Earth 3D Terrain / OSM (Keyless).',
     signupUrl: 'https://ion.cesium.com/signup',
     guideSteps: [
@@ -117,8 +125,10 @@ export const KEY_SPECS = {
     category: 'Street Level & Ground Imagery',
     required: false,
     freeQuota: '100% Free developer access (Unlimited client token)',
-    description: 'Powers interactive street-level 360-degree photography and roadside imagery in the Street Level layer.',
-    fallback: 'Street Level layer displays preview / unavailable without token.',
+    description:
+      'Powers interactive street-level 360-degree photography and roadside imagery in the Street Level layer.',
+    fallback:
+      'Street Level layer displays preview / unavailable without token.',
     signupUrl: 'https://www.mapillary.com/dashboard/developers',
     guideSteps: [
       'Visit mapillary.com/dashboard/developers and sign in or create a free account.',
@@ -133,7 +143,8 @@ export const KEY_SPECS = {
     category: 'Live Telemetry',
     required: false,
     freeQuota: 'Keyless anonymous mode works out-of-the-box (100% Free)',
-    description: 'Live commercial and civil aviation flight tracking across global airspace.',
+    description:
+      'Live commercial and civil aviation flight tracking across global airspace.',
     fallback: '100% Free keyless anonymous mode active by default.',
     signupUrl: 'https://opensky-network.org/',
     guideSteps: [
@@ -148,7 +159,8 @@ export const KEY_SPECS = {
     category: 'Live Telemetry',
     required: false,
     freeQuota: '100% Free public access works keyless out-of-the-box',
-    description: 'Live orbital rocket launches, payload trajectories, and upcoming spaceflight countdowns.',
+    description:
+      'Live orbital rocket launches, payload trajectories, and upcoming spaceflight countdowns.',
     fallback: '100% Free public rate-limited access active by default.',
     signupUrl: 'https://thespacedevs.com/',
     guideSteps: [
@@ -175,9 +187,11 @@ class KeyStore {
       }
     } catch {}
     try {
-      const envVal = (typeof import.meta !== 'undefined' && import.meta?.env?.[id])
-        || (typeof process !== 'undefined' && process?.env?.[id]);
-      if (envVal && typeof envVal === 'string' && envVal.trim()) return envVal.trim();
+      const envVal =
+        (typeof import.meta !== 'undefined' && import.meta?.env?.[id]) ||
+        (typeof process !== 'undefined' && process?.env?.[id]);
+      if (envVal && typeof envVal === 'string' && envVal.trim())
+        return envVal.trim();
     } catch {}
     return '';
   }
@@ -222,7 +236,8 @@ class KeyStore {
   }
 
   async testKey(id, explicitValue) {
-    const key = explicitValue !== undefined ? explicitValue.trim() : this.getKey(id);
+    const key =
+      explicitValue !== undefined ? explicitValue.trim() : this.getKey(id);
     if (!key) return { ok: false, message: 'Key is empty' };
 
     try {
@@ -232,9 +247,14 @@ class KeyStore {
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mapType: 'satellite', language: 'en-US', region: 'US' }),
+            body: JSON.stringify({
+              mapType: 'satellite',
+              language: 'en-US',
+              region: 'US',
+            }),
           });
-          if (res.ok) return { ok: true, message: 'Google 3D Tiles API key is valid!' };
+          if (res.ok)
+            return { ok: true, message: 'Google 3D Tiles API key is valid!' };
           const errData = await res.json().catch(() => ({}));
           return {
             ok: false,
@@ -258,17 +278,30 @@ class KeyStore {
             const res = await fetch(url);
             if (res.ok) {
               const txt = await res.text();
-              if (!txt.toLowerCase().includes('invalid') && !txt.toLowerCase().includes('error')) {
+              if (
+                !txt.toLowerCase().includes('invalid') &&
+                !txt.toLowerCase().includes('error')
+              ) {
                 return { ok: true, message: 'NASA FIRMS key is valid!' };
               }
             }
-            return { ok: false, message: 'NASA FIRMS key was rejected by provider' };
+            return {
+              ok: false,
+              message: 'NASA FIRMS key was rejected by provider',
+            };
           } catch (err) {
             // Direct client fetch can be blocked by CORS on some browser origins
             if (/^[a-fA-F0-9]{32}$/.test(key)) {
-              return { ok: true, message: 'NASA FIRMS key format verified (32-character hex key)!' };
+              return {
+                ok: true,
+                message:
+                  'NASA FIRMS key format verified (32-character hex key)!',
+              };
             }
-            return { ok: false, message: `NASA FIRMS connection test: ${err.message || err}` };
+            return {
+              ok: false,
+              message: `NASA FIRMS connection test: ${err.message || err}`,
+            };
           }
         }
         case GEV_KEYS.TOMTOM: {
@@ -284,26 +317,41 @@ class KeyStore {
         case GEV_KEYS.CESIUM_ION: {
           const url = `https://api.cesium.com/v1/assets?access_token=${encodeURIComponent(key)}`;
           const res = await fetch(url);
-          if (res.ok) return { ok: true, message: 'Cesium Ion token is valid!' };
+          if (res.ok)
+            return { ok: true, message: 'Cesium Ion token is valid!' };
           const errData = await res.json().catch(() => ({}));
-          return { ok: false, message: `Cesium Ion Error: ${errData.message || `HTTP ${res.status}`}` };
+          return {
+            ok: false,
+            message: `Cesium Ion Error: ${errData.message || `HTTP ${res.status}`}`,
+          };
         }
         case GEV_KEYS.AISSTREAM: {
           if (key.length >= 10 && /^[a-zA-Z0-9_\-.]+$/.test(key)) {
             return { ok: true, message: 'AISStream API key format verified!' };
           }
-          return { ok: false, message: 'AISStream key appears invalid (must be >= 10 characters).' };
+          return {
+            ok: false,
+            message:
+              'AISStream key appears invalid (must be >= 10 characters).',
+          };
         }
         case GEV_KEYS.MAPILLARY: {
           const url = `https://graph.mapillary.com/images?access_token=${encodeURIComponent(key)}&limit=1`;
           const res = await fetch(url);
-          if (res.ok) return { ok: true, message: 'Mapillary Client Token is valid!' };
+          if (res.ok)
+            return { ok: true, message: 'Mapillary Client Token is valid!' };
           const errData = await res.json().catch(() => ({}));
-          return { ok: false, message: `Mapillary Error: ${errData.error?.message || `HTTP ${res.status}`}` };
+          return {
+            ok: false,
+            message: `Mapillary Error: ${errData.error?.message || `HTTP ${res.status}`}`,
+          };
         }
         case GEV_KEYS.LL2: {
           if (key.length >= 8) {
-            return { ok: true, message: 'Launch Library 2 API token format verified!' };
+            return {
+              ok: true,
+              message: 'Launch Library 2 API token format verified!',
+            };
           }
           return { ok: false, message: 'Token must be at least 8 characters.' };
         }
@@ -311,7 +359,10 @@ class KeyStore {
           return { ok: true, message: 'Key saved.' };
       }
     } catch (e) {
-      return { ok: false, message: `Connection test failed: ${e.message || e}` };
+      return {
+        ok: false,
+        message: `Connection test failed: ${e.message || e}`,
+      };
     }
   }
 }
@@ -375,7 +426,10 @@ export class TitanLicense {
   }
 
   static isAndroid() {
-    return typeof window !== 'undefined' && Boolean(window.AndroidBridge && window.AndroidBridge.isAndroid?.());
+    return (
+      typeof window !== 'undefined' &&
+      Boolean(window.AndroidBridge && window.AndroidBridge.isAndroid?.())
+    );
   }
 
   static getDeviceId() {
@@ -384,7 +438,11 @@ export class TitanLicense {
       if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         id = 'WEB-' + crypto.randomUUID().toUpperCase();
       } else {
-        id = 'WEB-' + Math.random().toString(36).substring(2, 10).toUpperCase() + '-' + Date.now().toString(36).toUpperCase();
+        id =
+          'WEB-' +
+          Math.random().toString(36).substring(2, 10).toUpperCase() +
+          '-' +
+          Date.now().toString(36).toUpperCase();
       }
       this._setItem(LIC_KEYS.DEVICE_ID, id);
     }
@@ -429,12 +487,22 @@ export class TitanLicense {
     const trialInitialized = this.isTrialInitialized();
     const trialActive = this._getItem(LIC_KEYS.TRIAL_ACTIVE) === 'true';
     const trialDays = parseInt(this._getItem(LIC_KEYS.TRIAL_DAYS) || '0', 10);
-    const expiresEpoch = parseInt(this._getItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH) || '0', 10);
-    const lastKnown = parseInt(this._getItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH) || '0', 10);
+    const expiresEpoch = parseInt(
+      this._getItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH) || '0',
+      10,
+    );
+    const lastKnown = parseInt(
+      this._getItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH) || '0',
+      10,
+    );
     const now = Date.now();
 
-    const isClockRollback = lastKnown > 0 && now < (lastKnown - 60000);
-    const isExpired = !activated && (!trialActive || (expiresEpoch > 0 && now >= expiresEpoch) || isClockRollback);
+    const isClockRollback = lastKnown > 0 && now < lastKnown - 60000;
+    const isExpired =
+      !activated &&
+      (!trialActive ||
+        (expiresEpoch > 0 && now >= expiresEpoch) ||
+        isClockRollback);
 
     return {
       isActivated: activated,
@@ -442,7 +510,11 @@ export class TitanLicense {
       customerName: this._getItem(LIC_KEYS.CUSTOMER) || 'Valued Commander',
       tier: this._getItem(LIC_KEYS.TIER) || 'FREE',
       expiresAt: this._getItem(LIC_KEYS.EXPIRES) || 'Lifetime',
-      status: activated ? 'ACTIVE' : (!isExpired && trialActive) ? 'TRIAL_ACTIVE' : 'TRIAL_EXPIRED',
+      status: activated
+        ? 'ACTIVE'
+        : !isExpired && trialActive
+          ? 'TRIAL_ACTIVE'
+          : 'TRIAL_EXPIRED',
       isTrialInitialized: trialInitialized,
       isTrialActive: !isExpired && trialActive,
       trialDaysLeft: isExpired ? 0 : trialDays,
@@ -451,13 +523,20 @@ export class TitanLicense {
       deviceId: this.getDeviceId(),
       deviceModel: this.getDeviceModel(),
       appVersion: LICENSE_CONFIG.APP_VERSION,
-      lastVerifiedAt: parseInt(this._getItem(LIC_KEYS.LAST_VERIFIED) || '0', 10),
+      lastVerifiedAt: parseInt(
+        this._getItem(LIC_KEYS.LAST_VERIFIED) || '0',
+        10,
+      ),
     };
   }
 
   static async _postLicenseApi(payload) {
     const urls = [LICENSE_CONFIG.SERVER_URL];
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1')
+    ) {
       urls.push('/apps_suite/license.php');
       urls.push('http://localhost/apps_suite/license.php');
     }
@@ -491,7 +570,10 @@ export class TitanLicense {
         if (data && data.success) {
           this._setItem(LIC_KEYS.ACTIVATED, 'true');
           this._setItem(LIC_KEYS.KEY, key);
-          this._setItem(LIC_KEYS.CUSTOMER, data.customer_name || 'Valued Commander');
+          this._setItem(
+            LIC_KEYS.CUSTOMER,
+            data.customer_name || 'Valued Commander',
+          );
           this._setItem(LIC_KEYS.TIER, data.tier || 'PRO');
           this._setItem(LIC_KEYS.EXPIRES, data.expires_at || 'Lifetime');
           this._setItem(LIC_KEYS.TOKEN, data.token || '');
@@ -521,7 +603,10 @@ export class TitanLicense {
       if (data.success) {
         this._setItem(LIC_KEYS.ACTIVATED, 'true');
         this._setItem(LIC_KEYS.KEY, key);
-        this._setItem(LIC_KEYS.CUSTOMER, data.customer_name || 'Valued Commander');
+        this._setItem(
+          LIC_KEYS.CUSTOMER,
+          data.customer_name || 'Valued Commander',
+        );
         this._setItem(LIC_KEYS.TIER, data.tier || 'PRO');
         this._setItem(LIC_KEYS.EXPIRES, data.expires_at || 'Lifetime');
         this._setItem(LIC_KEYS.TOKEN, data.token || '');
@@ -533,11 +618,22 @@ export class TitanLicense {
           document.getElementById('gev-handshake-gate')?.remove();
         }
 
-        return { success: true, message: data.message || 'License Activated Successfully!', data };
+        return {
+          success: true,
+          message: data.message || 'License Activated Successfully!',
+          data,
+        };
       }
-      return { success: false, error: data.error || data.message || 'Activation failed.' };
+      return {
+        success: false,
+        error: data.error || data.message || 'Activation failed.',
+      };
     } catch (e) {
-      return { success: false, error: 'Network error connecting to license server: ' + (e.message || e) };
+      return {
+        success: false,
+        error:
+          'Network error connecting to license server: ' + (e.message || e),
+      };
     }
   }
 
@@ -583,13 +679,21 @@ export class TitanLicense {
       this._removeItem(LIC_KEYS.KEY);
       this._removeItem(LIC_KEYS.TOKEN);
       this._removeItem(LIC_KEYS.TIER);
-      return { success: false, status: data.status || 'UNBOUND', error: data.error || data.message };
+      return {
+        success: false,
+        status: data.status || 'UNBOUND',
+        error: data.error || data.message,
+      };
     } catch {
       const last = parseInt(this._getItem(LIC_KEYS.LAST_VERIFIED) || '0', 10);
       if (last > 0 && Date.now() - last < LICENSE_CONFIG.OFFLINE_GRACE_MS) {
         return { success: true, status: 'OFFLINE_GRACE', isOfflineGrace: true };
       }
-      return { success: false, status: 'OFFLINE_EXPIRED', error: 'Offline grace expired.' };
+      return {
+        success: false,
+        status: 'OFFLINE_EXPIRED',
+        error: 'Offline grace expired.',
+      };
     }
   }
 
@@ -601,11 +705,24 @@ export class TitanLicense {
         if (data) {
           if (data.success) {
             this._setItem(LIC_KEYS.TRIAL_INITIALIZED, 'true');
-            this._setItem(LIC_KEYS.TRIAL_ACTIVE, data.trial_active ? 'true' : 'false');
-            this._setItem(LIC_KEYS.TRIAL_DAYS, (data.days_left || 0).toString());
-            if (data.trial_expires_epoch) this._setItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH, data.trial_expires_epoch.toString());
+            this._setItem(
+              LIC_KEYS.TRIAL_ACTIVE,
+              data.trial_active ? 'true' : 'false',
+            );
+            this._setItem(
+              LIC_KEYS.TRIAL_DAYS,
+              (data.days_left || 0).toString(),
+            );
+            if (data.trial_expires_epoch)
+              this._setItem(
+                LIC_KEYS.TRIAL_EXPIRES_EPOCH,
+                data.trial_expires_epoch.toString(),
+              );
             if (data.token) this._setItem(LIC_KEYS.TRIAL_TOKEN, data.token);
-            this._setItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH, Date.now().toString());
+            this._setItem(
+              LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH,
+              Date.now().toString(),
+            );
           }
           return data;
         }
@@ -636,11 +753,17 @@ export class TitanLicense {
       const data = await this._postLicenseApi(payload);
       const trialActive = Boolean(data.trial_active);
       const daysLeft = typeof data.days_left === 'number' ? data.days_left : 0;
-      const expiresEpoch = typeof data.trial_expires_epoch === 'number' && data.trial_expires_epoch > 0
-        ? data.trial_expires_epoch
-        : (Date.now() + (daysLeft * 86400000));
+      const expiresEpoch =
+        typeof data.trial_expires_epoch === 'number' &&
+        data.trial_expires_epoch > 0
+          ? data.trial_expires_epoch
+          : Date.now() + daysLeft * 86400000;
       const token = data.token || '';
-      const message = data.message || (trialActive ? `Trial is active (${daysLeft} days remaining).` : 'Trial expired.');
+      const message =
+        data.message ||
+        (trialActive
+          ? `Trial is active (${daysLeft} days remaining).`
+          : 'Trial expired.');
 
       this._setItem(LIC_KEYS.TRIAL_INITIALIZED, 'true');
       this._setItem(LIC_KEYS.TRIAL_ACTIVE, trialActive ? 'true' : 'false');
@@ -665,23 +788,31 @@ export class TitanLicense {
           trial_active: false,
           days_left: 0,
           isHandshakeRequired: true,
-          message: 'One-time internet connection required to start your free trial.',
+          message:
+            'One-time internet connection required to start your free trial.',
         };
       }
 
       const now = Date.now();
-      const lastKnown = parseInt(this._getItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH) || '0', 10);
-      const expiresEpoch = parseInt(this._getItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH) || '0', 10);
+      const lastKnown = parseInt(
+        this._getItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH) || '0',
+        10,
+      );
+      const expiresEpoch = parseInt(
+        this._getItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH) || '0',
+        10,
+      );
 
       // Anti-Clock Rollback Guard (1-min tolerance: 60,000ms)
-      if (lastKnown > 0 && now < (lastKnown - 60000)) {
+      if (lastKnown > 0 && now < lastKnown - 60000) {
         this._setItem(LIC_KEYS.TRIAL_ACTIVE, 'false');
         return {
           success: true,
           trial_active: false,
           days_left: 0,
           isHandshakeRequired: false,
-          message: 'Clock rollback detected. Please restore correct system time.',
+          message:
+            'Clock rollback detected. Please restore correct system time.',
         };
       }
 
@@ -699,9 +830,13 @@ export class TitanLicense {
       }
 
       // Offline active calculation
-      const msRemaining = expiresEpoch > 0 ? (expiresEpoch - now) : 0;
-      const calculatedDays = msRemaining > 0 ? Math.ceil(msRemaining / 86400000) : 1;
-      this._setItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH, Math.max(lastKnown, now).toString());
+      const msRemaining = expiresEpoch > 0 ? expiresEpoch - now : 0;
+      const calculatedDays =
+        msRemaining > 0 ? Math.ceil(msRemaining / 86400000) : 1;
+      this._setItem(
+        LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH,
+        Math.max(lastKnown, now).toString(),
+      );
       this._setItem(LIC_KEYS.TRIAL_DAYS, calculatedDays.toString());
 
       return {
@@ -722,7 +857,8 @@ export class TitanLicense {
         const data = JSON.parse(resStr);
         if (data) {
           const latest = data.latest_version || LICENSE_CONFIG.APP_VERSION;
-          const hasUpdate = this.compareVersions(latest, LICENSE_CONFIG.APP_VERSION) > 0;
+          const hasUpdate =
+            this.compareVersions(latest, LICENSE_CONFIG.APP_VERSION) > 0;
           return { ...data, isUpdateAvailable: hasUpdate };
         }
       } catch (e) {
@@ -731,16 +867,25 @@ export class TitanLicense {
     }
 
     try {
-      const payload = { action: 'check_update', app_slug: LICENSE_CONFIG.APP_SLUG, app_name: LICENSE_CONFIG.APP_NAME };
+      const payload = {
+        action: 'check_update',
+        app_slug: LICENSE_CONFIG.APP_SLUG,
+        app_name: LICENSE_CONFIG.APP_NAME,
+      };
       const data = await this._postLicenseApi(payload);
       if (data.success) {
         const latest = data.latest_version || LICENSE_CONFIG.APP_VERSION;
-        const hasUpdate = this.compareVersions(latest, LICENSE_CONFIG.APP_VERSION) > 0;
+        const hasUpdate =
+          this.compareVersions(latest, LICENSE_CONFIG.APP_VERSION) > 0;
         return { ...data, isUpdateAvailable: hasUpdate };
       }
       return { success: false, isUpdateAvailable: false, error: data.error };
     } catch (e) {
-      return { success: false, isUpdateAvailable: false, error: e.message || String(e) };
+      return {
+        success: false,
+        isUpdateAvailable: false,
+        error: e.message || String(e),
+      };
     }
   }
 
@@ -749,7 +894,9 @@ export class TitanLicense {
       try {
         const resStr = window.AndroidBridge.deactivateLicense();
         if (resStr) {
-          try { JSON.parse(resStr); } catch {}
+          try {
+            JSON.parse(resStr);
+          } catch {}
         }
       } catch (e) {
         console.warn('[LicenseBridge] Android deactivateLicense error:', e);
@@ -779,8 +926,14 @@ export class TitanLicense {
   }
 
   static compareVersions(v1, v2) {
-    const p1 = (v1 || '').replace(/^v/i, '').split('.').map(x => parseInt(x, 10) || 0);
-    const p2 = (v2 || '').replace(/^v/i, '').split('.').map(x => parseInt(x, 10) || 0);
+    const p1 = (v1 || '')
+      .replace(/^v/i, '')
+      .split('.')
+      .map((x) => parseInt(x, 10) || 0);
+    const p2 = (v2 || '')
+      .replace(/^v/i, '')
+      .split('.')
+      .map((x) => parseInt(x, 10) || 0);
     const len = Math.max(p1.length, p2.length);
     for (let i = 0; i < len; i++) {
       const a = p1[i] || 0;
@@ -840,7 +993,8 @@ export class TitanLicense {
         this.startWatchdog();
       } else if (res.isHandshakeRequired) {
         statusBox.style.display = 'block';
-        statusBox.textContent = '✕ Connection required. Please check your network and retry.';
+        statusBox.textContent =
+          '✕ Connection required. Please check your network and retry.';
         btnConnect.disabled = false;
         btnConnect.textContent = '⚡ Retry Connection';
       } else {
@@ -993,7 +1147,7 @@ export class TitanLicense {
     const statusBox = modal.querySelector('#gev-act-status');
 
     closeBtn.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => {
+    modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.remove();
     });
 
@@ -1096,20 +1250,28 @@ export class TitanLicense {
     `;
     document.body.appendChild(modal);
 
-    modal.querySelector('#gev-manage-close').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => {
+    modal
+      .querySelector('#gev-manage-close')
+      .addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.remove();
     });
 
-    modal.querySelector('#gev-btn-unbind').addEventListener('click', async () => {
-      if (confirm('Are you sure you want to unbind and deactivate this device from your license?')) {
-        modal.remove();
-        await this.deactivate();
-        alert('Device unlinked successfully.');
-        options.onDeactivated?.();
-        this.showHardLockoutOverlay();
-      }
-    });
+    modal
+      .querySelector('#gev-btn-unbind')
+      .addEventListener('click', async () => {
+        if (
+          confirm(
+            'Are you sure you want to unbind and deactivate this device from your license?',
+          )
+        ) {
+          modal.remove();
+          await this.deactivate();
+          alert('Device unlinked successfully.');
+          options.onDeactivated?.();
+          this.showHardLockoutOverlay();
+        }
+      });
   }
 
   static showTrialStartupAlert(daysLeft) {
@@ -1136,11 +1298,15 @@ export class TitanLicense {
     `;
     document.body.appendChild(toast);
 
-    toast.querySelector('#gev-btn-trial-continue').addEventListener('click', () => toast.remove());
-    toast.querySelector('#gev-btn-trial-activate').addEventListener('click', () => {
-      toast.remove();
-      this.showActivationModal();
-    });
+    toast
+      .querySelector('#gev-btn-trial-continue')
+      .addEventListener('click', () => toast.remove());
+    toast
+      .querySelector('#gev-btn-trial-activate')
+      .addEventListener('click', () => {
+        toast.remove();
+        this.showActivationModal();
+      });
 
     setTimeout(() => {
       if (toast && toast.parentNode) toast.remove();
@@ -1193,9 +1359,13 @@ export class TitanLicense {
     `;
     document.body.appendChild(modal);
 
-    modal.querySelector('#gev-update-close').addEventListener('click', () => modal.remove());
-    modal.querySelector('#gev-btn-update-later').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => {
+    modal
+      .querySelector('#gev-update-close')
+      .addEventListener('click', () => modal.remove());
+    modal
+      .querySelector('#gev-btn-update-later')
+      .addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
       if (e.target === modal) modal.remove();
     });
   }
@@ -1211,11 +1381,17 @@ export class TitanLicense {
       }
 
       const now = Date.now();
-      const lastKnown = parseInt(this._getItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH) || '0', 10);
-      const expiresEpoch = parseInt(this._getItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH) || '0', 10);
+      const lastKnown = parseInt(
+        this._getItem(LIC_KEYS.TRIAL_LAST_KNOWN_EPOCH) || '0',
+        10,
+      );
+      const expiresEpoch = parseInt(
+        this._getItem(LIC_KEYS.TRIAL_EXPIRES_EPOCH) || '0',
+        10,
+      );
 
       // Anti-Clock Rollback Guard (1-min tolerance: 60,000ms)
-      if (lastKnown > 0 && now < (lastKnown - 60000)) {
+      if (lastKnown > 0 && now < lastKnown - 60000) {
         this._setItem(LIC_KEYS.TRIAL_ACTIVE, 'false');
         clearInterval(this._watchdogTimer);
         this._watchdogTimer = null;
@@ -1249,11 +1425,19 @@ export class TitanLicense {
 
     if (info.isActivated) {
       // Heartbeat verify in background
-      this.verify().then(res => {
-        if (!res.success && (res.status === 'UNBOUND' || res.status === 'EXPIRED' || res.status === 'REVOKED' || res.status === 'SUSPENDED')) {
-          this.showHardLockoutOverlay();
-        }
-      }).catch(() => {});
+      this.verify()
+        .then((res) => {
+          if (
+            !res.success &&
+            (res.status === 'UNBOUND' ||
+              res.status === 'EXPIRED' ||
+              res.status === 'REVOKED' ||
+              res.status === 'SUSPENDED')
+          ) {
+            this.showHardLockoutOverlay();
+          }
+        })
+        .catch(() => {});
     } else {
       const trialResult = await this.checkTrial();
       if (trialResult.isHandshakeRequired) {
@@ -1267,11 +1451,13 @@ export class TitanLicense {
     }
 
     // In-app update check
-    this.checkUpdate().then(update => {
-      if (update && update.isUpdateAvailable) {
-        this.showUpdateModal(update);
-      }
-    }).catch(() => {});
+    this.checkUpdate()
+      .then((update) => {
+        if (update && update.isUpdateAvailable) {
+          this.showUpdateModal(update);
+        }
+      })
+      .catch(() => {});
   }
 }
 
@@ -1338,24 +1524,36 @@ export function initKeyConfigModal() {
 
   document.body.appendChild(modalEl);
 
-  document.getElementById('gev-config-close').addEventListener('click', hideKeyConfigModal);
-  document.getElementById('gev-config-cancel').addEventListener('click', hideKeyConfigModal);
-  modalEl.addEventListener('click', e => {
+  document
+    .getElementById('gev-config-close')
+    .addEventListener('click', hideKeyConfigModal);
+  document
+    .getElementById('gev-config-cancel')
+    .addEventListener('click', hideKeyConfigModal);
+  modalEl.addEventListener('click', (e) => {
     if (e.target === modalEl) hideKeyConfigModal();
   });
 
-  document.getElementById('gev-config-save').addEventListener('click', saveAndApplyKeys);
-  document.getElementById('gev-config-clear-all').addEventListener('click', () => {
-    if (confirm('Clear all saved personal API keys and revert to open-source defaults?')) {
-      for (const keyId of Object.values(GEV_KEYS)) {
-        keyStore.removeKey(keyId);
+  document
+    .getElementById('gev-config-save')
+    .addEventListener('click', saveAndApplyKeys);
+  document
+    .getElementById('gev-config-clear-all')
+    .addEventListener('click', () => {
+      if (
+        confirm(
+          'Clear all saved personal API keys and revert to open-source defaults?',
+        )
+      ) {
+        for (const keyId of Object.values(GEV_KEYS)) {
+          keyStore.removeKey(keyId);
+        }
+        renderCards();
+        updateStatusBar();
       }
-      renderCards();
-      updateStatusBar();
-    }
-  });
+    });
 
-  window.addEventListener('keydown', e => {
+  window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isOpen) hideKeyConfigModal();
   });
 
@@ -1381,9 +1579,11 @@ function updateStatusBar() {
   const engineStatus = document.getElementById('gev-engine-status');
   if (engineStatus) {
     if (keyStore.hasKey(GEV_KEYS.GOOGLE_MAPS)) {
-      engineStatus.innerHTML = '<span style="color:#00ff88;">● GOOGLE 3D TILES</span>';
+      engineStatus.innerHTML =
+        '<span style="color:#00ff88;">● GOOGLE 3D TILES</span>';
     } else {
-      engineStatus.innerHTML = '<span style="color:#38bdf8;">● OSM + RE:EARTH (FREE)</span>';
+      engineStatus.innerHTML =
+        '<span style="color:#38bdf8;">● OSM + RE:EARTH (FREE)</span>';
     }
   }
 
@@ -1395,7 +1595,8 @@ function updateStatusBar() {
     } else if (info.isTrialActive && !info.isTrialExpired) {
       licenseStatus.innerHTML = `<span style="color:#ffc83b; font-weight:700;">● TRIAL (${info.trialDaysLeft}d left)</span>`;
     } else {
-      licenseStatus.innerHTML = '<span style="color:#ff4d6d; font-weight:700;">✕ EXPIRED</span>';
+      licenseStatus.innerHTML =
+        '<span style="color:#ff4d6d; font-weight:700;">✕ EXPIRED</span>';
     }
   }
 }
@@ -1459,47 +1660,53 @@ function renderCards() {
   `;
   body.appendChild(licCard);
 
-  licCard.querySelector('#gev-btn-manage-lic')?.addEventListener('click', () => {
-    if (TitanLicense.isAndroid()) {
-      if (licInfo.isActivated) {
-        window.AndroidBridge.showLicenseManagementDialog();
-      } else {
-        window.AndroidBridge.showActivationDialog();
-      }
-    } else {
-      if (licInfo.isActivated) {
-        TitanLicense.showManageLicenseModal({
-          onDeactivated: () => {
-            renderCards();
-            updateStatusBar();
-          },
-        });
-      } else {
-        TitanLicense.showActivationModal({
-          onActivated: () => {
-            renderCards();
-            updateStatusBar();
-          },
-        });
-      }
-    }
-  });
-
-  licCard.querySelector('#gev-btn-check-update')?.addEventListener('click', () => {
-    if (TitanLicense.isAndroid()) {
-      window.AndroidBridge.checkForUpdates();
-    } else {
-      TitanLicense.checkUpdate().then(res => {
-        if (res.isUpdateAvailable) {
-          TitanLicense.showUpdateModal(res);
-        } else if (res.success) {
-          alert(`✓ God's Eye View is up to date (v${LICENSE_CONFIG.APP_VERSION})`);
+  licCard
+    .querySelector('#gev-btn-manage-lic')
+    ?.addEventListener('click', () => {
+      if (TitanLicense.isAndroid()) {
+        if (licInfo.isActivated) {
+          window.AndroidBridge.showLicenseManagementDialog();
         } else {
-          alert('Could not reach update server.');
+          window.AndroidBridge.showActivationDialog();
         }
-      });
-    }
-  });
+      } else {
+        if (licInfo.isActivated) {
+          TitanLicense.showManageLicenseModal({
+            onDeactivated: () => {
+              renderCards();
+              updateStatusBar();
+            },
+          });
+        } else {
+          TitanLicense.showActivationModal({
+            onActivated: () => {
+              renderCards();
+              updateStatusBar();
+            },
+          });
+        }
+      }
+    });
+
+  licCard
+    .querySelector('#gev-btn-check-update')
+    ?.addEventListener('click', () => {
+      if (TitanLicense.isAndroid()) {
+        window.AndroidBridge.checkForUpdates();
+      } else {
+        TitanLicense.checkUpdate().then((res) => {
+          if (res.isUpdateAvailable) {
+            TitanLicense.showUpdateModal(res);
+          } else if (res.success) {
+            alert(
+              `✓ God's Eye View is up to date (v${LICENSE_CONFIG.APP_VERSION})`,
+            );
+          } else {
+            alert('Could not reach update server.');
+          }
+        });
+      }
+    });
 
   // 2. Render Provider Key Cards
   Object.entries(KEY_SPECS).forEach(([id, spec]) => {
@@ -1551,7 +1758,7 @@ function renderCards() {
         <div class="gev-guide-inner">
           <div class="gev-guide-title">How to get your free key:</div>
           <ol class="gev-guide-steps">
-            ${spec.guideSteps.map(step => `<li>${step}</li>`).join('')}
+            ${spec.guideSteps.map((step) => `<li>${step}</li>`).join('')}
           </ol>
           <a href="${spec.signupUrl}" target="_blank" rel="noopener noreferrer" class="gev-guide-link">
             Open Provider Portal ↗ (${new URL(spec.signupUrl).hostname})
@@ -1575,8 +1782,8 @@ function renderCards() {
   });
 
   // Clear button handlers
-  body.querySelectorAll('.gev-btn-clear').forEach(btn => {
-    btn.addEventListener('click', e => {
+  body.querySelectorAll('.gev-btn-clear').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
       const targetId = e.currentTarget.getAttribute('data-target');
       const input = document.getElementById(targetId);
       if (input) {
@@ -1588,14 +1795,17 @@ function renderCards() {
   });
 
   // Paste button handlers
-  body.querySelectorAll('.paste-key-btn').forEach(btn => {
-    btn.addEventListener('click', async e => {
+  body.querySelectorAll('.paste-key-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
       const targetId = e.currentTarget.getAttribute('data-target');
       const input = document.getElementById(targetId);
       if (!input) return;
 
       try {
-        if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+        if (
+          navigator.clipboard &&
+          typeof navigator.clipboard.readText === 'function'
+        ) {
           const clipText = await navigator.clipboard.readText();
           if (clipText && clipText.trim()) {
             input.value = clipText.trim();
@@ -1619,8 +1829,8 @@ function renderCards() {
   });
 
   // Toggle visibility button handlers
-  body.querySelectorAll('.gev-toggle-vis-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
+  body.querySelectorAll('.gev-toggle-vis-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
       const targetId = e.currentTarget.getAttribute('data-target');
       const input = document.getElementById(targetId);
       if (input) {
@@ -1632,8 +1842,8 @@ function renderCards() {
   });
 
   // Toggle guide button handlers
-  body.querySelectorAll('.guide-key-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
+  body.querySelectorAll('.guide-key-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
       const targetId = e.currentTarget.getAttribute('data-target');
       const guide = document.getElementById(targetId);
       if (guide) {
@@ -1645,8 +1855,8 @@ function renderCards() {
   });
 
   // Test key button handlers
-  body.querySelectorAll('.test-key-btn').forEach(btn => {
-    btn.addEventListener('click', async e => {
+  body.querySelectorAll('.test-key-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
       const keyId = e.currentTarget.getAttribute('data-keyid');
       const input = document.getElementById(`input-${keyId}`);
       const result = document.getElementById(`result-${keyId}`);
@@ -1692,11 +1902,13 @@ function saveAndApplyKeys() {
         changedKeys.push(keyId);
         if (keyId === GEV_KEYS.GOOGLE_MAPS) {
           window.__GOOGLE_MAPS_API_KEY__ = newVal || undefined;
-          if (window.Cesium) Cesium.GoogleMaps.defaultApiKey = newVal || undefined;
+          if (window.Cesium)
+            Cesium.GoogleMaps.defaultApiKey = newVal || undefined;
           reloadNeeded = true;
         }
         if (keyId === GEV_KEYS.CESIUM_ION) {
-          if (window.Cesium) Cesium.Ion.defaultAccessToken = newVal || undefined;
+          if (window.Cesium)
+            Cesium.Ion.defaultAccessToken = newVal || undefined;
           reloadNeeded = true;
         }
       }
@@ -1707,14 +1919,20 @@ function saveAndApplyKeys() {
 
   if (changed) {
     try {
-      window.dispatchEvent(new CustomEvent('gev:keys-updated', { detail: { changedKeys } }));
+      window.dispatchEvent(
+        new CustomEvent('gev:keys-updated', { detail: { changedKeys } }),
+      );
     } catch {}
 
     if (reloadNeeded) {
-      const ok = confirm('Globe 3D map engine keys have been updated. Reload the page now to apply the new 3D engine?');
+      const ok = confirm(
+        'Globe 3D map engine keys have been updated. Reload the page now to apply the new 3D engine?',
+      );
       if (ok) window.location.reload();
     } else {
-      alert('✓ Configuration saved! Telemetry layers will use the updated credentials.');
+      alert(
+        '✓ Configuration saved! Telemetry layers will use the updated credentials.',
+      );
     }
   }
 }
@@ -2287,22 +2505,31 @@ function injectModalStyles() {
 /**
  * Request device GPS coordinates and fly camera to the user's location.
  */
-export async function flyToDeviceLocation(viewer, showToast = (msg) => console.log(msg)) {
+export async function flyToDeviceLocation(
+  viewer,
+  showToast = (msg) => console.log(msg),
+) {
   const onLocationSuccess = (lat, lon, accuracy = 0, altitude = 0) => {
     if (viewer?.camera) {
       const CesiumObj = globalThis.Cesium;
       if (CesiumObj?.Cartesian3 && CesiumObj?.Math) {
         const targetAlt = Math.max(0, altitude || 0);
         const targetPos = CesiumObj.Cartesian3.fromDegrees(lon, lat, targetAlt);
-        const heading = Number.isFinite(viewer.camera.heading) ? viewer.camera.heading : 0;
+        const heading = Number.isFinite(viewer.camera.heading)
+          ? viewer.camera.heading
+          : 0;
         const range = Math.max(380, Math.min(1200, (accuracy || 0) * 3 + 450));
         viewer.camera.cancelFlight?.();
-        if (typeof viewer.camera.flyToBoundingSphere === 'function' && CesiumObj.BoundingSphere && CesiumObj.HeadingPitchRange) {
+        if (
+          typeof viewer.camera.flyToBoundingSphere === 'function' &&
+          CesiumObj.BoundingSphere &&
+          CesiumObj.HeadingPitchRange
+        ) {
           const sphere = new CesiumObj.BoundingSphere(targetPos, 0);
           const offset = new CesiumObj.HeadingPitchRange(
             heading,
             CesiumObj.Math.toRadians(-70),
-            range
+            range,
           );
           viewer.camera.flyToBoundingSphere(sphere, {
             offset,
@@ -2314,7 +2541,7 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
             destination: CesiumObj.Cartesian3.fromDegrees(
               lon,
               lat,
-              Math.max(480, targetAlt + 480)
+              Math.max(480, targetAlt + 480),
             ),
             orientation: {
               heading,
@@ -2333,7 +2560,7 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
           const pos = CesiumObj.Cartesian3.fromDegrees(
             lon,
             lat,
-            Math.max(0, altitude || 0) + 2
+            Math.max(0, altitude || 0) + 2,
           );
           let marker = viewer.entities.getById('my-location-marker');
           if (marker) {
@@ -2353,9 +2580,13 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
               ellipse: {
                 semiMajorAxis: Math.max(30, accuracy || 45),
                 semiMinorAxis: Math.max(30, accuracy || 45),
-                material: CesiumObj.Color.fromCssColorString('rgba(0, 212, 255, 0.28)'),
+                material: CesiumObj.Color.fromCssColorString(
+                  'rgba(0, 212, 255, 0.28)',
+                ),
                 outline: true,
-                outlineColor: CesiumObj.Color.fromCssColorString('rgba(0, 212, 255, 0.9)'),
+                outlineColor: CesiumObj.Color.fromCssColorString(
+                  'rgba(0, 212, 255, 0.9)',
+                ),
                 outlineWidth: 2,
               },
             });
@@ -2377,14 +2608,26 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
       try {
         const geoUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
         const resp = await fetch(geoUrl, {
-          headers: { 'Accept': 'application/json' },
+          headers: { Accept: 'application/json' },
         }).catch(() => null);
         if (resp?.ok) {
           const data = await resp.json();
           const addr = data?.address || {};
-          city = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.suburb || '';
-          detail = addr.neighbourhood || addr.road || addr.state || addr.country || '';
-          placeName = city ? (detail ? `${city}, ${detail}` : city) : (data?.display_name?.split(',').slice(0, 2).join(',') || '');
+          city =
+            addr.city ||
+            addr.town ||
+            addr.village ||
+            addr.municipality ||
+            addr.county ||
+            addr.suburb ||
+            '';
+          detail =
+            addr.neighbourhood || addr.road || addr.state || addr.country || '';
+          placeName = city
+            ? detail
+              ? `${city}, ${detail}`
+              : city
+            : data?.display_name?.split(',').slice(0, 2).join(',') || '';
         }
       } catch (_e) {
         // Fallback
@@ -2396,7 +2639,9 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
       }
       const miniPoiEl = document.getElementById('location-mini-poi');
       if (miniPoiEl) {
-        miniPoiEl.textContent = detail || (accuracy > 0 ? `GPS ±${Math.round(accuracy)}m` : 'Current Location');
+        miniPoiEl.textContent =
+          detail ||
+          (accuracy > 0 ? `GPS ±${Math.round(accuracy)}m` : 'Current Location');
       }
       const searchInput = document.getElementById('location-search');
       if (searchInput && placeName) {
@@ -2408,7 +2653,9 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
       }
 
       if (placeName) {
-        showToast(`📍 ${placeName} [${lat.toFixed(4)}°, ${lon.toFixed(4)}°]${accMsg}`);
+        showToast(
+          `📍 ${placeName} [${lat.toFixed(4)}°, ${lon.toFixed(4)}°]${accMsg}`,
+        );
       }
     })();
   };
@@ -2432,8 +2679,16 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
       const raw = window.AndroidBridge.getLastKnownLocation();
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Number.isFinite(parsed?.latitude) && Number.isFinite(parsed?.longitude)) {
-          onLocationSuccess(parsed.latitude, parsed.longitude, parsed.accuracy || 0, parsed.altitude || 0);
+        if (
+          Number.isFinite(parsed?.latitude) &&
+          Number.isFinite(parsed?.longitude)
+        ) {
+          onLocationSuccess(
+            parsed.latitude,
+            parsed.longitude,
+            parsed.accuracy || 0,
+            parsed.altitude || 0,
+          );
           return;
         }
       }
@@ -2452,12 +2707,17 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
   navigator.geolocation.getCurrentPosition(
     (position) => {
       const coords = position.coords;
-      onLocationSuccess(coords.latitude, coords.longitude, coords.accuracy, coords.altitude);
+      onLocationSuccess(
+        coords.latitude,
+        coords.longitude,
+        coords.accuracy,
+        coords.altitude,
+      );
     },
     (error) => {
       onLocationError(error);
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
   );
 }
 
@@ -2465,14 +2725,26 @@ export async function flyToDeviceLocation(viewer, showToast = (msg) => console.l
  * Automatically attach stored API keys from KeyStore to outgoing API requests.
  */
 export function installKeyStoreFetchInterceptor() {
-  if (typeof window === 'undefined' || !window.fetch || window.__gev_fetch_interceptor_installed) return;
+  if (
+    typeof window === 'undefined' ||
+    !window.fetch ||
+    window.__gev_fetch_interceptor_installed
+  )
+    return;
   window.__gev_fetch_interceptor_installed = true;
   const originalFetch = window.fetch;
   window.fetch = async function (input, init = {}) {
     try {
-      const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input));
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof Request
+            ? input.url
+            : String(input);
       if (url.startsWith('/api/') || url.includes('/api/')) {
-        const headers = new Headers(init.headers || (input instanceof Request ? input.headers : {}));
+        const headers = new Headers(
+          init.headers || (input instanceof Request ? input.headers : {}),
+        );
         const firmsKey = keyStore.getKey(GEV_KEYS.NASA_FIRMS);
         if (firmsKey && !headers.has('x-firms-map-key')) {
           headers.set('x-firms-map-key', firmsKey);
@@ -2491,5 +2763,3 @@ export function installKeyStoreFetchInterceptor() {
     return originalFetch(input, init);
   };
 }
-
-

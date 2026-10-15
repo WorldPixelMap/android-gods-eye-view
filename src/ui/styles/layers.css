@@ -328,16 +328,19 @@
   scrollbar-gutter: stable;
 }
 
-#right-context-rail.layout-focus > #pp-toggles:not(.collapsed)::-webkit-scrollbar {
+#right-context-rail.layout-focus
+  > #pp-toggles:not(.collapsed)::-webkit-scrollbar {
   width: 6px;
 }
 
-#right-context-rail.layout-focus > #pp-toggles:not(.collapsed)::-webkit-scrollbar-track {
+#right-context-rail.layout-focus
+  > #pp-toggles:not(.collapsed)::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 999px;
 }
 
-#right-context-rail.layout-focus > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb {
+#right-context-rail.layout-focus
+  > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
     rgba(0, 212, 255, 0.65),
@@ -346,7 +349,8 @@
   border-radius: 999px;
 }
 
-#right-context-rail.layout-focus > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover {
+#right-context-rail.layout-focus
+  > #pp-toggles:not(.collapsed)::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(
     180deg,
     rgba(0, 212, 255, 0.85),

@@ -56,7 +56,9 @@ export function createStandaloneLayerSources(overrides = {}) {
     mapillary: createMapillarySource({
       token:
         (typeof globalThis.localStorage?.getItem === 'function' &&
-          globalThis.localStorage.getItem('GEV_KEY_MAPILLARY_CLIENT_TOKEN')?.trim()) ||
+          globalThis.localStorage
+            .getItem('GEV_KEY_MAPILLARY_CLIENT_TOKEN')
+            ?.trim()) ||
         import.meta.env?.MAPILLARY_CLIENT_TOKEN ||
         '',
     }),

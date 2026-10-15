@@ -104,7 +104,9 @@ export function layoutRightPanelRail({
       onCollapse(panel);
     }
   }
-  const isMobile = windowRef.matchMedia('(max-width: 720px)').matches || windowRef.matchMedia('(max-height: 600px)').matches;
+  const isMobile =
+    windowRef.matchMedia('(max-width: 720px)').matches ||
+    windowRef.matchMedia('(max-height: 600px)').matches;
   const hasExpandedPanel = panels.some(
     (panel) =>
       !panel.classList.contains('collapsed') &&
@@ -139,9 +141,7 @@ export function layoutRightPanelRail({
     viewportHeight,
     getComputedStyle,
   );
-  const alignedTop = Number.isFinite(leftStackTop)
-    ? leftStackTop
-    : 48;
+  const alignedTop = Number.isFinite(leftStackTop) ? leftStackTop : 48;
   const obstacleRects = [];
 
   for (const obstacle of obstacles) {

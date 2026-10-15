@@ -72,17 +72,15 @@ export function _initCctvPanel() {
           const currIdx = liveCams.findIndex(
             (c) => c.id === this._cctvState?.activeCameraId,
           );
-          const nextIdx =
-            currIdx <= 0 ? liveCams.length - 1 : currIdx - 1;
+          const nextIdx = currIdx <= 0 ? liveCams.length - 1 : currIdx - 1;
           const nextId = liveCams[nextIdx].id;
           return this.cctv.selectCamera(nextId) ? nextId : null;
         }
       }
       return this.cctv.cycleCamera(-1);
     };
-    this.actions.runExplicitFocus(
-      cyclePrev,
-      (cameraId) => this.cctv.focusCamera(cameraId, 1.4),
+    this.actions.runExplicitFocus(cyclePrev, (cameraId) =>
+      this.cctv.focusCamera(cameraId, 1.4),
     );
   });
 
@@ -118,9 +116,8 @@ export function _initCctvPanel() {
       }
       return this.cctv.cycleCamera(1);
     };
-    this.actions.runExplicitFocus(
-      cycleNext,
-      (cameraId) => this.cctv.focusCamera(cameraId, 1.4),
+    this.actions.runExplicitFocus(cycleNext, (cameraId) =>
+      this.cctv.focusCamera(cameraId, 1.4),
     );
   });
 

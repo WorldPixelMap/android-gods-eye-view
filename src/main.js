@@ -23,8 +23,7 @@ function setupFullscreenToggle() {
     (typeof window !== 'undefined' &&
       window.AndroidBridge &&
       Boolean(window.AndroidBridge.isAndroid?.())) ||
-    (typeof navigator !== 'undefined' &&
-      /android/i.test(navigator.userAgent));
+    (typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent));
 
   if (isAndroid) {
     fsBtn.style.display = 'none';
@@ -46,20 +45,25 @@ function setupFullscreenToggle() {
     try {
       window.dispatchEvent(new KeyboardEvent('keydown', eventParams));
       document.dispatchEvent(new KeyboardEvent('keydown', eventParams));
-      document.documentElement.dispatchEvent(new KeyboardEvent('keydown', eventParams));
+      document.documentElement.dispatchEvent(
+        new KeyboardEvent('keydown', eventParams),
+      );
       window.dispatchEvent(new KeyboardEvent('keyup', eventParams));
       document.dispatchEvent(new KeyboardEvent('keyup', eventParams));
-      document.documentElement.dispatchEvent(new KeyboardEvent('keyup', eventParams));
+      document.documentElement.dispatchEvent(
+        new KeyboardEvent('keyup', eventParams),
+      );
     } catch {}
   };
 
   const getIsFullscreen = () => {
     return Boolean(
       document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement ||
-        (window.innerHeight === screen.height && window.innerWidth === screen.width)
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement ||
+      (window.innerHeight === screen.height &&
+        window.innerWidth === screen.width),
     );
   };
 
@@ -90,9 +94,9 @@ function setupFullscreenToggle() {
     // Toggle browser Fullscreen API
     const isFs = Boolean(
       document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement,
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement,
     );
 
     if (isFs) {
@@ -173,61 +177,68 @@ if (document.readyState === 'loading') {
 }
 
 const application = createStandaloneApplication({
-  googleApiKey: keyStore.getKey(GEV_KEYS.GOOGLE_MAPS) || import.meta.env.GOOGLE_MAPS_API_KEY,
-  cesiumToken: keyStore.getKey(GEV_KEYS.CESIUM_ION) || import.meta.env.CESIUM_ION_TOKEN,
+  googleApiKey:
+    keyStore.getKey(GEV_KEYS.GOOGLE_MAPS) ||
+    import.meta.env.GOOGLE_MAPS_API_KEY,
+  cesiumToken:
+    keyStore.getKey(GEV_KEYS.CESIUM_ION) || import.meta.env.CESIUM_ION_TOKEN,
   allowQaRegistration: import.meta.env.DEV,
 });
 
-application.start().then((components) => {
-  // Initialize Tactical In-App BYOK Configuration Modal
-  initKeyConfigModal();
-  const configBtn = document.getElementById('gev-config-btn');
-  if (configBtn) {
-    configBtn.addEventListener('click', () => showKeyConfigModal());
-  }
+application
+  .start()
+  .then((components) => {
+    // Initialize Tactical In-App BYOK Configuration Modal
+    initKeyConfigModal();
+    const configBtn = document.getElementById('gev-config-btn');
+    if (configBtn) {
+      configBtn.addEventListener('click', () => showKeyConfigModal());
+    }
 
-  // Initialize Native GPS Fly-to Handler
-  const myLocationBtn = document.getElementById('my-location-btn');
-  if (myLocationBtn) {
-    myLocationBtn.addEventListener('click', () => {
-      myLocationBtn.classList.add('locating');
-      const viewer =
-        components?.scene?.viewer ||
-        window.__godsEyeView?.application?.getComponents?.()?.scene?.viewer ||
-        globalThis.viewer;
-      flyToDeviceLocation(viewer, (msg) => {
-        myLocationBtn.classList.remove('locating');
-        const toast = document.getElementById('toast');
-        if (toast) {
-          toast.textContent = msg;
-          toast.classList.add('visible');
-          setTimeout(() => toast.classList.remove('visible'), 4000);
-        }
+    // Initialize Native GPS Fly-to Handler
+    const myLocationBtn = document.getElementById('my-location-btn');
+    if (myLocationBtn) {
+      myLocationBtn.addEventListener('click', () => {
+        myLocationBtn.classList.add('locating');
+        const viewer =
+          components?.scene?.viewer ||
+          window.__godsEyeView?.application?.getComponents?.()?.scene?.viewer ||
+          globalThis.viewer;
+        flyToDeviceLocation(viewer, (msg) => {
+          myLocationBtn.classList.remove('locating');
+          const toast = document.getElementById('toast');
+          if (toast) {
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 4000);
+          }
+        });
       });
-    });
-  }
+    }
 
-  // Initialize Titan Hardware Licensing & Verification
-  TitanLicense.initProtection().catch((err) => {
-    console.warn('[TitanLicense] Protection initialization error:', err);
+    // Initialize Titan Hardware Licensing & Verification
+    TitanLicense.initProtection().catch((err) => {
+      console.warn('[TitanLicense] Protection initialization error:', err);
+    });
+
+    // Expose global for debugging and bridge inspection
+    window.__godsEyeView = {
+      application,
+      components,
+      viewer: components?.scene?.viewer,
+      styleManager: components?.controls?.styleManager,
+      dataManager: components?.data?.dataManager,
+    };
+  })
+  .catch((error) => {
+    console.error("God's Eye View initialization failed:", error);
+    const loaderStatus = document.querySelector(
+      '#loading-screen .loader-status',
+    );
+    if (loaderStatus) {
+      loaderStatus.textContent = `Error: ${describeError(error)}`;
+      loaderStatus.style.color = '#ff4444';
+    }
   });
 
-  // Expose global for debugging and bridge inspection
-  window.__godsEyeView = {
-    application,
-    components,
-    viewer: components?.scene?.viewer,
-    styleManager: components?.controls?.styleManager,
-    dataManager: components?.data?.dataManager,
-  };
-}).catch((error) => {
-  console.error("God's Eye View initialization failed:", error);
-  const loaderStatus = document.querySelector('#loading-screen .loader-status');
-  if (loaderStatus) {
-    loaderStatus.textContent = `Error: ${describeError(error)}`;
-    loaderStatus.style.color = '#ff4444';
-  }
-});
-
 export { application };
-

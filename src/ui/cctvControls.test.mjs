@@ -279,9 +279,27 @@ test('live filter toggles dropdown between all cameras and live video feeds', ()
   const state = {
     enabled: true,
     cameras: [
-      { id: 'cam1', city: 'Austin', name: 'Still 1', feedType: 'image', isVideo: false },
-      { id: 'cam2', city: 'Dover', name: 'DE 1 Live', feedType: 'hls', isVideo: true },
-      { id: 'cam3', city: 'London', name: 'Still 2', feedType: 'image', isVideo: false },
+      {
+        id: 'cam1',
+        city: 'Austin',
+        name: 'Still 1',
+        feedType: 'image',
+        isVideo: false,
+      },
+      {
+        id: 'cam2',
+        city: 'Dover',
+        name: 'DE 1 Live',
+        feedType: 'hls',
+        isVideo: true,
+      },
+      {
+        id: 'cam3',
+        city: 'London',
+        name: 'Still 2',
+        feedType: 'image',
+        isVideo: false,
+      },
     ],
   };
 

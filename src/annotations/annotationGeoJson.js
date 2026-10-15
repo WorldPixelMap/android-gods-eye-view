@@ -20,7 +20,14 @@
  * re-initializes it.
  */
 
-const VALID_TYPES = new Set(['pin', 'highlight', 'label', 'arrow', 'route', 'area']);
+const VALID_TYPES = new Set([
+  'pin',
+  'highlight',
+  'label',
+  'arrow',
+  'route',
+  'area',
+]);
 
 /** {lon,lat,height?} -> GeoJSON position, or null if not a finite lon/lat. */
 function toPosition(p) {
@@ -30,8 +37,11 @@ function toPosition(p) {
 
 /** GeoJSON position -> {lon,lat,height?}, or null if malformed. */
 function fromPosition(c) {
-  if (!Array.isArray(c) || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) return null;
-  return Number.isFinite(c[2]) ? { lon: c[0], lat: c[1], height: c[2] } : { lon: c[0], lat: c[1] };
+  if (!Array.isArray(c) || !Number.isFinite(c[0]) || !Number.isFinite(c[1]))
+    return null;
+  return Number.isFinite(c[2])
+    ? { lon: c[0], lat: c[1], height: c[2] }
+    : { lon: c[0], lat: c[1] };
 }
 
 /** Mean of a runtime ring (`[[lon,lat],...]`), used as a fallback area anchor on import. */
@@ -39,7 +49,10 @@ function ringCentroid(ring) {
   if (!Array.isArray(ring) || ring.length === 0) return null;
   let sx = 0;
   let sy = 0;
-  for (const [lon, lat] of ring) { sx += lon; sy += lat; }
+  for (const [lon, lat] of ring) {
+    sx += lon;
+    sy += lat;
+  }
   return { lon: sx / ring.length, lat: sy / ring.length };
 }
 
@@ -49,7 +62,8 @@ function ringCentroid(ring) {
  * @returns {object|null} A GeoJSON Feature, or null if `anno` can't form a valid geometry.
  */
 export function annotationToFeature(anno) {
-  if (!anno || typeof anno !== 'object' || !VALID_TYPES.has(anno.type)) return null;
+  if (!anno || typeof anno !== 'object' || !VALID_TYPES.has(anno.type))
+    return null;
   const type = anno.type;
   const properties = {
     'gev:type': type,
@@ -61,7 +75,9 @@ export function annotationToFeature(anno) {
   let geometry = null;
 
   if (type === 'route') {
-    const coords = (Array.isArray(anno.path) ? anno.path : []).map(toPosition).filter(Boolean);
+    const coords = (Array.isArray(anno.path) ? anno.path : [])
+      .map(toPosition)
+      .filter(Boolean);
     if (coords.length < 2) return null;
     geometry = { type: 'LineString', coordinates: coords };
     properties['gev:mode'] = anno.mode ?? null;
@@ -73,16 +89,26 @@ export function annotationToFeature(anno) {
     const to = toPosition(anno.to);
     if (!from || !to) return null;
     geometry = { type: 'LineString', coordinates: [from, to] };
-  } else if (type === 'area' && Array.isArray(anno.ring) && anno.ring.length >= 3) {
+  } else if (
+    type === 'area' &&
+    Array.isArray(anno.ring) &&
+    anno.ring.length >= 3
+  ) {
     const ring = [];
     for (const pair of anno.ring) {
-      if (!Array.isArray(pair) || !Number.isFinite(pair[0]) || !Number.isFinite(pair[1])) return null;
+      if (
+        !Array.isArray(pair) ||
+        !Number.isFinite(pair[0]) ||
+        !Number.isFinite(pair[1])
+      )
+        return null;
       ring.push([pair[0], pair[1]]);
     }
     // GeoJSON linear rings must be explicitly closed (first === last).
     const first = ring[0];
     const last = ring[ring.length - 1];
-    if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]]);
+    if (first[0] !== last[0] || first[1] !== last[1])
+      ring.push([first[0], first[1]]);
     geometry = { type: 'Polygon', coordinates: [ring] };
     properties['gev:footprintKind'] = anno.footprintKind ?? null;
     properties['gev:buildingHeight'] = anno.buildingHeight ?? null;
@@ -111,7 +137,13 @@ export function annotationToFeature(anno) {
  * @returns {object|null}
  */
 export function featureToAnnotation(feature) {
-  if (!feature || feature.type !== 'Feature' || !feature.geometry || !feature.properties) return null;
+  if (
+    !feature ||
+    feature.type !== 'Feature' ||
+    !feature.geometry ||
+    !feature.properties
+  )
+    return null;
   const g = feature.geometry;
   const p = feature.properties;
   const type = p['gev:type'];
@@ -126,7 +158,12 @@ export function featureToAnnotation(feature) {
   };
 
   if (type === 'route') {
-    if (g.type !== 'LineString' || !Array.isArray(g.coordinates) || g.coordinates.length < 2) return null;
+    if (
+      g.type !== 'LineString' ||
+      !Array.isArray(g.coordinates) ||
+      g.coordinates.length < 2
+    )
+      return null;
     const path = g.coordinates.map(fromPosition);
     if (path.some((x) => !x)) return null;
     return {
@@ -143,7 +180,12 @@ export function featureToAnnotation(feature) {
   }
 
   if (type === 'arrow') {
-    if (g.type !== 'LineString' || !Array.isArray(g.coordinates) || g.coordinates.length !== 2) return null;
+    if (
+      g.type !== 'LineString' ||
+      !Array.isArray(g.coordinates) ||
+      g.coordinates.length !== 2
+    )
+      return null;
     const from = fromPosition(g.coordinates[0]);
     const to = fromPosition(g.coordinates[1]);
     if (!from || !to) return null;
@@ -151,12 +193,18 @@ export function featureToAnnotation(feature) {
   }
 
   if (g.type === 'Polygon') {
-    if (type !== 'area' || !Array.isArray(g.coordinates) || !Array.isArray(g.coordinates[0])) return null;
+    if (
+      type !== 'area' ||
+      !Array.isArray(g.coordinates) ||
+      !Array.isArray(g.coordinates[0])
+    )
+      return null;
     const raw = g.coordinates[0];
     if (raw.length < 4) return null; // a closed triangle is the minimum (4 positions)
     const ring = [];
     for (const c of raw) {
-      if (!Array.isArray(c) || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) return null;
+      if (!Array.isArray(c) || !Number.isFinite(c[0]) || !Number.isFinite(c[1]))
+        return null;
       ring.push([c[0], c[1]]);
     }
     // Drop the GeoJSON closing duplicate to match the runtime ring (not explicitly closed).
@@ -208,6 +256,11 @@ export function annotationsToFeatureCollection(annotations) {
  * @returns {Array<object>}
  */
 export function featureCollectionToAnnotations(collection) {
-  if (!collection || collection.type !== 'FeatureCollection' || !Array.isArray(collection.features)) return [];
+  if (
+    !collection ||
+    collection.type !== 'FeatureCollection' ||
+    !Array.isArray(collection.features)
+  )
+    return [];
   return collection.features.map(featureToAnnotation).filter(Boolean);
 }

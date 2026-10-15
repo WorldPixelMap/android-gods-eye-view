@@ -395,7 +395,10 @@ export class PanelPositionControls {
       const portable = this._portablePanels.get(panelId);
       if (Boolean(pos.floating) !== Boolean(portable)) return;
       if (portable) {
-        if (portable.dockOnCollapse && panelEl.classList.contains('collapsed')) {
+        if (
+          portable.dockOnCollapse &&
+          panelEl.classList.contains('collapsed')
+        ) {
           return;
         }
         panelEl.classList.add('panel-floating', 'panel-draggable');

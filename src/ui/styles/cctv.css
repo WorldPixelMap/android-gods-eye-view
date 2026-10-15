@@ -206,7 +206,9 @@
   color: #00d4ff;
   border-radius: 6px;
   pointer-events: auto;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 #cctv-panel .panel-collapse-btn:hover,
@@ -232,9 +234,13 @@
 #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar,
 #cctv-panel:not(.collapsed) .cyber-panel-body::-webkit-scrollbar,
 #left-panel-stack > #cctv-panel:not(.collapsed)::-webkit-scrollbar,
-#left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar,
+#left-panel-stack
+  > #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar,
 #right-context-rail #cctv-panel:not(.collapsed)::-webkit-scrollbar,
-#right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar {
+#right-context-rail
+  #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar {
   width: 6px;
 }
 
@@ -249,9 +255,13 @@
 #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track,
 #cctv-panel:not(.collapsed) .cyber-panel-body::-webkit-scrollbar-track,
 #left-panel-stack > #cctv-panel:not(.collapsed)::-webkit-scrollbar-track,
-#left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track,
+#left-panel-stack
+  > #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar-track,
 #right-context-rail #cctv-panel:not(.collapsed)::-webkit-scrollbar-track,
-#right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-track {
+#right-context-rail
+  #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 999px;
 }
@@ -260,9 +270,13 @@
 #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb,
 #cctv-panel:not(.collapsed) .cyber-panel-body::-webkit-scrollbar-thumb,
 #left-panel-stack > #cctv-panel:not(.collapsed)::-webkit-scrollbar-thumb,
-#left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb,
+#left-panel-stack
+  > #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar-thumb,
 #right-context-rail #cctv-panel:not(.collapsed)::-webkit-scrollbar-thumb,
-#right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb {
+#right-context-rail
+  #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
     rgba(0, 212, 255, 0.65),
@@ -275,9 +289,13 @@
 #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover,
 #cctv-panel:not(.collapsed) .cyber-panel-body::-webkit-scrollbar-thumb:hover,
 #left-panel-stack > #cctv-panel:not(.collapsed)::-webkit-scrollbar-thumb:hover,
-#left-panel-stack > #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover,
+#left-panel-stack
+  > #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar-thumb:hover,
 #right-context-rail #cctv-panel:not(.collapsed)::-webkit-scrollbar-thumb:hover,
-#right-context-rail #cctv-panel:not(.collapsed) .cctv-panel-inner::-webkit-scrollbar-thumb:hover {
+#right-context-rail
+  #cctv-panel:not(.collapsed)
+  .cctv-panel-inner::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(
     180deg,
     rgba(0, 212, 255, 0.85),

@@ -57,9 +57,9 @@ export function _renderCctvState(state) {
   const isCameraLive = (cam) =>
     Boolean(
       cam?.isVideo ||
-        cam?.feedType === 'hls' ||
-        cam?.feedType === 'mp4' ||
-        cam?.feedType === 'webm',
+      cam?.feedType === 'hls' ||
+      cam?.feedType === 'mp4' ||
+      cam?.feedType === 'webm',
     );
   const liveCount = cameras.filter(isCameraLive).length;
   const displayCameras = this._liveOnly
@@ -69,7 +69,9 @@ export function _renderCctvState(state) {
   if (this._cctvLiveFilterBtn) {
     this._cctvLiveFilterBtn.disabled = !enabled || cameras.length === 0;
     this._cctvLiveFilterBtn.classList.toggle('active', !!this._liveOnly);
-    this._cctvLiveFilterBtn.textContent = this._liveOnly ? 'LIVE ONLY' : 'ALL CAMS';
+    this._cctvLiveFilterBtn.textContent = this._liveOnly
+      ? 'LIVE ONLY'
+      : 'ALL CAMS';
     this._cctvLiveFilterBtn.title =
       liveCount > 0
         ? `Filter to live streaming video cameras (${liveCount} available)`
